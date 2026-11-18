@@ -5,439 +5,1174 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>Spidey Toronto Swing</title>
+<title>SPIDEY: TORONTO SWING — 3D SPIDER-VERSE EDITION</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
-html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:"Arial Black",Impact,sans-serif}
-canvas{display:block;width:100vw;height:100vh}
+:root {
+  --crimson: #FF1744;
+  --cyan: #00E5FF;
+  --gold: #FFD600;
+  --ink: #070812;
+  --panel: rgba(10, 12, 26, 0.88);
+  --font-display: "Impact", "Haettenschweiler", "Franklin Gothic Heavy", sans-serif;
+  --font-ui: "Trebuchet MS", "Gill Sans", "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "Menlo", "Consolas", monospace;
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body {
+  margin: 0; height: 100%; background: var(--ink); overflow: hidden;
+  font-family: var(--font-ui); color: #F8FAFC; user-select: none;
+}
+canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
+
+/* Comic book atmospheric vignette */
+.halftone {
+  position: fixed; inset: 0; pointer-events: none; z-index: 2;
+  box-shadow: inset 0 0 110px rgba(5, 6, 17, 0.72);
+}
+
+/* Top HUD bar */
+.hud-top {
+  position: fixed; top: 16px; left: 20px; right: 20px; z-index: 10;
+  display: flex; align-items: flex-start; justify-content: space-between;
+  pointer-events: none; gap: 16px;
+}
+.hud-left { display: flex; flex-direction: column; gap: 10px; pointer-events: auto; }
+
+.score-plaque {
+  background: var(--panel);
+  border: 2px solid #FFFFFF;
+  box-shadow: 6px 6px 0 var(--crimson), 10px 10px 0 rgba(0,229,255,0.45);
+  padding: 10px 18px;
+  transform: skewX(-6deg);
+  display: flex; align-items: baseline; gap: 18px;
+}
+.score-main {
+  font-family: var(--font-display);
+  font-size: 2.5rem; letter-spacing: 0.04em; line-height: 1;
+  color: #FFFFFF; text-shadow: 3px 3px 0 var(--crimson), -2px -2px 0 var(--cyan);
+}
+.score-meta {
+  display: flex; flex-direction: column; gap: 2px;
+  font-family: var(--font-mono); font-size: 0.78rem; color: #FFE082;
+}
+.combo-pill {
+  display: inline-block;
+  background: var(--gold); color: #070812;
+  font-family: var(--font-display); font-size: 1.25rem; letter-spacing: 0.05em;
+  padding: 3px 12px; border: 2px solid #070812;
+  box-shadow: 4px 4px 0 var(--crimson);
+  transform: skewX(-8deg) rotate(-2deg);
+  width: fit-content;
+}
+
+.street-banner {
+  background: #0A5C36;
+  border: 2.5px solid #FFFFFF;
+  box-shadow: 5px 5px 0 #070812;
+  padding: 6px 14px;
+  display: inline-flex; align-items: center; gap: 10px;
+  font-weight: 800; letter-spacing: 0.05em; font-size: 0.88rem;
+  color: #FFFFFF; width: fit-content;
+}
+.street-banner .route-tag {
+  background: #FFFFFF; color: #0A5C36;
+  padding: 2px 6px; font-weight: 900; font-size: 0.75rem;
+}
+.street-banner .speed-tag {
+  font-family: var(--font-mono); color: #A7F3D0; font-size: 0.8rem;
+}
+
+/* Interactive Control Dock (Suit & 2D/3D Map Switcher) */
+.control-dock {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  background: var(--panel);
+  border: 2px solid rgba(255,255,255,0.85);
+  box-shadow: 5px 5px 0 rgba(0, 229, 255, 0.7);
+  padding: 8px 10px;
+  transform: skewX(-4deg);
+}
+.dock-group {
+  display: flex; align-items: center; gap: 5px;
+}
+.dock-divider {
+  width: 2px; height: 24px; background: rgba(255,255,255,0.22); margin: 0 4px;
+}
+.chip-btn {
+  appearance: none; border: 2px solid rgba(255,255,255,0.35);
+  background: rgba(19, 24, 48, 0.9); color: #E2E8F0;
+  font-family: var(--font-ui); font-weight: 800; font-size: 0.76rem;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  padding: 5px 10px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px;
+  transition: transform 0.12s cubic-bezier(0.22, 1, 0.36, 1), background 0.12s, border-color 0.12s;
+}
+.chip-btn:hover {
+  transform: translate(-2px, -2px);
+  border-color: #FFFFFF; background: #1E293B; color: #FFFFFF;
+}
+.chip-btn.active {
+  background: var(--crimson); color: #FFFFFF;
+  border-color: #FFFFFF;
+  box-shadow: 3px 3px 0 var(--cyan);
+}
+.chip-btn.map-btn.active {
+  background: var(--cyan); color: #050711;
+  border-color: #FFFFFF;
+  box-shadow: 3px 3px 0 var(--crimson);
+}
+.swatch {
+  width: 11px; height: 11px; border-radius: 50%;
+  border: 1.5px solid #FFFFFF; display: inline-block;
+}
+
+/* Overlay Modal for Start / Crash */
+.overlay-card {
+  position: fixed; left: 50%; top: 52%;
+  transform: translate(-50%, -50%) skewX(-3deg);
+  z-index: 20;
+  background: rgba(8, 10, 22, 0.93);
+  border: 3px solid #FFFFFF;
+  box-shadow: 12px 12px 0 var(--crimson), -8px -8px 0 var(--cyan);
+  padding: 28px 36px;
+  max-width: 580px; width: calc(100vw - 40px);
+  text-align: center;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.overlay-card.hidden {
+  opacity: 0; pointer-events: none;
+  transform: translate(-50%, -46%) scale(0.96);
+}
+.overlay-title {
+  margin: 0 0 8px;
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 5vw, 4.1rem);
+  letter-spacing: 0.04em; line-height: 0.96;
+  color: #FFFFFF;
+  text-shadow: 4px 4px 0 var(--crimson), -3px -3px 0 var(--cyan);
+}
+.overlay-sub {
+  margin: 0 0 18px;
+  font-size: 1rem; line-height: 1.45; color: #CBD5E1;
+  max-width: 48ch; margin-inline: auto;
+}
+.cta-btn {
+  appearance: none;
+  background: var(--gold); color: #070812;
+  border: 3px solid #FFFFFF;
+  box-shadow: 6px 6px 0 var(--crimson);
+  font-family: var(--font-display);
+  font-size: 1.55rem; letter-spacing: 0.06em;
+  padding: 10px 28px; cursor: pointer;
+  transform: skewX(-6deg);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.cta-btn:hover {
+  transform: skewX(-6deg) translate(-2px, -2px);
+  box-shadow: 9px 9px 0 var(--cyan);
+}
+.key-hints {
+  margin-top: 16px;
+  display: flex; justify-content: center; flex-wrap: wrap; gap: 12px;
+  font-family: var(--font-mono); font-size: 0.75rem; color: #94A3B8;
+}
+.key-hints kbd {
+  background: #1E293B; color: #F8FAFC;
+  border: 1px solid #475569; padding: 2px 6px; font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .score-main { font-size: 1.8rem; }
+  .control-dock { max-width: 92vw; }
+}
 </style>
 </head>
 <body>
+<div class="halftone"></div>
+
+<header class="hud-top">
+  <div class="hud-left">
+    <div class="score-plaque">
+      <div class="score-main" id="scoreVal">000000</div>
+      <div class="score-meta">
+        <span id="bestVal">BEST 0</span>
+        <span id="distVal">QUEEN ST W • 0.0 KM</span>
+      </div>
+    </div>
+
+    <div class="combo-pill" id="comboPill" style="display:none">x2 WEB STREAK!</div>
+
+    <div class="street-banner">
+      <span class="route-tag">501 QUEEN</span>
+      <span id="streetVal">Near Bathurst St</span>
+      <span class="speed-tag" id="speedVal">26 km/h</span>
+    </div>
+
+    <nav class="control-dock" aria-label="Suit and Map Controls" onpointerdown="event.stopPropagation()">
+      <div class="dock-group" id="suitGroup">
+        <button class="chip-btn active" data-suit="0" onclick="setSuit(0)">
+          <span class="swatch" style="background:linear-gradient(135deg,#111 50%,#FF1744 50%)"></span>Miles [1]
+        </button>
+        <button class="chip-btn" data-suit="1" onclick="setSuit(1)">
+          <span class="swatch" style="background:linear-gradient(135deg,#B71C1C 50%,#FFD600 50%)"></span>Iron Spider [2]
+        </button>
+        <button class="chip-btn" data-suit="2" onclick="setSuit(2)">
+          <span class="swatch" style="background:linear-gradient(135deg,#0B0E17 50%,#00E5FF 50%)"></span>Symbiote [3]
+        </button>
+        <button class="chip-btn" data-suit="3" onclick="setSuit(3)">
+          <span class="swatch" style="background:linear-gradient(135deg,#E53935 50%,#1E40AF 50%)"></span>Classic [4]
+        </button>
+      </div>
+      <div class="dock-divider"></div>
+      <div class="dock-group">
+        <button class="chip-btn map-btn active" id="btn3D" onclick="setMapMode('3d')">3D City Map [M]</button>
+        <button class="chip-btn map-btn" id="btn2D" onclick="setMapMode('2d')">2D Carto Map [M]</button>
+      </div>
+    </nav>
+  </div>
+</header>
+
+<section class="overlay-card" id="overlayCard" onpointerdown="event.stopPropagation()">
+  <h1 class="overlay-title" id="ovTitle">SPIDEY: TORONTO SWING</h1>
+  <p class="overlay-sub" id="ovSub">
+    Whip across Queen Street West over real OpenStreetMap blocks, 3D Toronto skyscrapers, the CN Tower, and TTC 501 streetcars.
+  </p>
+  <button class="cta-btn" id="ovBtn" onclick="start()">LAUNCH WEB SWING [SPACE]</button>
+  <div class="key-hints">
+    <span><kbd>HOLD SPACE</kbd> / <kbd>CLICK</kbd> Shoot Web</span>
+    <span><kbd>RELEASE</kbd> Launch Forward</span>
+    <span><kbd>1–4</kbd> Change Suit</span>
+    <span><kbd>M</kbd> Toggle 3D / 2D Map</span>
+  </div>
+</section>
+
 <canvas id="c"></canvas>
+
 <script>
 const cv = document.getElementById('c'), ctx = cv.getContext('2d');
 let W, H;
 function resize(){ W = cv.width = innerWidth; H = cv.height = innerHeight; }
 addEventListener('resize', resize); resize();
 
-// ---- Toronto route: Queen St W heading east, real cross-street order ----
-const STREETS = ['Bathurst St','Spadina Ave','John St','University Ave','Bay St','Yonge St','Church St','Jarvis St','Sherbourne St','Parliament St','River St'];
-const BLOCK = 8;               // buildings per block
-const CELL = 190;              // px per building cell
+// ---- Toronto Queen St W Route ----
+const STREETS = [
+  'Bathurst St','Spadina Ave','John St','University Ave','Bay St',
+  'Yonge St','Church St','Jarvis St','Sherbourne St','Parliament St','River St'
+];
+const BLOCK = 7;
+const CELL = 205;
 const STREET_LEN = BLOCK * CELL;
 const ROUTE_LEN = STREET_LEN * STREETS.length;
-// Landmarks placed along the route (world x, far parallax skyline)
-const CN_X = STREET_LEN * 1.3;       // near Spadina/John – CN Tower
-const ROGERS_X = STREET_LEN * 1.9;
-const CITYHALL_X = STREET_LEN * 4.5; // Nathan Phillips Sq. between Bay & Yonge
+const CN_X = STREET_LEN * 1.45;
+const ROGERS_X = STREET_LEN * 2.05;
+const CITYHALL_X = STREET_LEN * 4.45;
+
+// ---- 4 Iconic Spider-Suits ("New Dress" wardrobe) ----
+const SUITS = [
+  {
+    name: 'MILES MORALES',
+    primary: '#101320',
+    secondary: '#1B2038',
+    accent: '#FF1744',
+    web: '#00E5FF',
+    eyeGlow: '#FFFFFF',
+    eyeTrim: '#FF1744',
+    trail: ['#FF1744', '#00E5FF'],
+    waldoes: false,
+    hoodie: true
+  },
+  {
+    name: 'IRON SPIDER',
+    primary: '#99091E',
+    secondary: '#172347',
+    accent: '#FFD600',
+    web: '#FFE57F',
+    eyeGlow: '#80D8FF',
+    eyeTrim: '#FFD600',
+    trail: ['#FFD600', '#FF1744'],
+    waldoes: true,
+    hoodie: false
+  },
+  {
+    name: 'SYMBIOTE SURGE',
+    primary: '#080910',
+    secondary: '#15192B',
+    accent: '#FFFFFF',
+    web: '#E0F7FA',
+    eyeGlow: '#FFFFFF',
+    eyeTrim: '#00E5FF',
+    trail: ['#00E5FF', '#B388FF'],
+    waldoes: false,
+    hoodie: false
+  },
+  {
+    name: 'SPIDER-VERSE CLASSIC',
+    primary: '#E51C23',
+    secondary: '#153296',
+    accent: '#111111',
+    web: '#FFFFFF',
+    eyeGlow: '#FFFFFF',
+    eyeTrim: '#090B10',
+    trail: ['#FFFFFF', '#FF1744'],
+    waldoes: false,
+    hoodie: false
+  }
+];
+let suitIdx = 0;
+let mapMode = '3d'; // '3d' or '2d'
+
+function setSuit(idx){
+  suitIdx = ((idx % SUITS.length) + SUITS.length) % SUITS.length;
+  document.querySelectorAll('#suitGroup .chip-btn').forEach((b, i) => {
+    b.classList.toggle('active', i === suitIdx);
+  });
+  if (P) {
+    burst(P.x, P.y, 18, SUITS[suitIdx].accent);
+    popups.push({x: P.x, y: P.y - 45, txt: SUITS[suitIdx].name + '!', col: SUITS[suitIdx].accent, l: 1.0});
+  }
+}
+
+function setMapMode(mode){
+  mapMode = mode;
+  document.getElementById('btn3D').classList.toggle('active', mapMode === '3d');
+  document.getElementById('btn2D').classList.toggle('active', mapMode === '2d');
+}
 
 function rnd(i){ const s = Math.sin(i*127.1+311.7)*43758.5453; return s - Math.floor(s); }
 
-// near buildings: deterministic per cell
+// Deterministic Toronto buildings along Queen St W
+const BLD_PAL = [
+  { front: '#10172A', side: '#1E293B', roof: '#0F172A', neon: '#00E5FF', win: '#FDE68A' },
+  { front: '#181326', side: '#2E1F47', roof: '#1F1633', neon: '#FF1744', win: '#BAE6FD' },
+  { front: '#0F1F2E', side: '#1B3854', roof: '#162E45', neon: '#FFD600', win: '#FDE047' },
+  { front: '#1B1A2E', side: '#2D2B4E', roof: '#23223D', neon: '#F43F5E', win: '#E0E7FF' }
+];
+const SIGNS = ['MUCHMUSIC','QUEEN BOOKS','SPADINA LOFT','REX JAZZ','VELVET','CAMERON','DRAKE','EATON','OSGOODE','MASSEY'];
+
 function bld(i){
-  const inBlock = ((i % BLOCK)+BLOCK)%BLOCK;
-  if (inBlock === BLOCK-1) return null; // cross street gap
+  const inBlock = ((i % BLOCK) + BLOCK) % BLOCK;
+  if (inBlock === BLOCK - 1) return null; // Cross-street intersection gap
   const r = rnd(i);
-  return { x: i*CELL + 10 + rnd(i+9)*20, w: 120 + rnd(i+3)*50, h: 200 + r*r*300 + (rnd(i+5)>.85?100:0), hue: Math.floor(rnd(i+7)*5), win: rnd(i+11) };
+  const w = 128 + rnd(i+3)*48;
+  const h = 195 + r*r*290 + (rnd(i+5)>.82 ? 95 : 0);
+  return {
+    i,
+    x: i*CELL + 10 + rnd(i+9)*16,
+    w, h,
+    depth: 34 + rnd(i+15)*22,
+    pal: BLD_PAL[Math.floor(rnd(i+7)*BLD_PAL.length)],
+    winSeed: rnd(i+11),
+    sign: rnd(i+19) > 0.45 ? SIGNS[Math.abs(i)%SIGNS.length] : null
+  };
 }
 function topAt(x){
   const i = Math.floor(x/CELL), b = bld(i);
-  if (b && x>=b.x && x<=b.x+b.w) return b.h;
+  if (b && x >= b.x && x <= b.x + b.w) return b.h;
   return null;
 }
 
-// ---- game state ----
-const GRAV = 1400, GROUND = 70;
-let overAt=0, P, cam, anchor, ropeLen, holding, score, best = +localStorage.spideyBest||0, tokens, combo, time, state='menu', shake=0, particles=[], cars=[], speedMult=1;
+// ---- Game State ----
+const GRAV = 1380, GROUND = 115;
+let overAt = 0, P, cam, anchor, ropeLen, holding, score, best = +localStorage.spideyBest || 0;
+let tokens = [], combo = 0, time = 0, state = 'menu', shake = 0, particles = [], popups = [], cars = [], trail = [];
+
 function reset(){
-  P = {x: 300, y: H*0.4, vx: 260, vy: 0, ang:0};
-  cam = {x: 0}; anchor=null; holding=false; score=0; combo=0; time=0; particles=[];
-  tokens = []; cars=[]; speedMult=1;
+  P = { x: 300, y: H*0.36, vx: 270, vy: 0, ang: 0 };
+  cam = { x: 0 }; anchor = null; holding = false; score = 0; combo = 0; time = 0;
+  particles = []; popups = []; tokens = []; cars = []; trail = [];
 }
 reset();
 
-function worldY(h){ return H - GROUND - h; } // screen y of building top for height h
+function worldY(h){ return H - GROUND - h; }
 
 function attach(){
-  if (state!=='play') return;
-  // choose anchor ahead & above, snapping to a rooftop
-  let ax = P.x + 140 + Math.max(0,P.vx)*0.25, ay = null;
-  for (let k=0;k<40 && ay===null;k++){
+  if (state !== 'play') return;
+  let ax = P.x + 145 + Math.max(0, P.vx)*0.24, ay = null;
+  for (let k = 0; k < 42 && ay === null; k++){
     const h = topAt(ax + k*14);
-    if (h!==null){ const y = worldY(h); if (y < P.y - 60){ ax += k*14; ay = y; } }
+    if (h !== null){
+      const y = worldY(h);
+      if (y < P.y - 55){ ax += k*14; ay = y; }
+    }
   }
-  if (ay===null){ ax = P.x+160; ay = Math.max(40, P.y-240); }
-  ay = Math.max(30, Math.min(ay, P.y-90));
-  anchor = {x: ax, y: ay};
-  ropeLen = Math.hypot(ax-P.x, ay-P.y)*0.8; P.vy -= 120;
+  if (ay === null){ ax = P.x + 165; ay = Math.max(48, P.y - 230); }
+  ay = Math.max(36, Math.min(ay, P.y - 85));
+  anchor = { x: ax, y: ay };
+  ropeLen = Math.hypot(ax - P.x, ay - P.y) * 0.82;
+  P.vy -= 115;
   holding = true;
-  burst(ax, ay, 6, '#fff');
+  const suit = SUITS[suitIdx];
+  burst(ax, ay, 10, suit.web);
+  const words = ['THWIP!', 'SHWIP!', 'YOINK!', 'SNAP!'];
+  popups.push({ x: P.x + 30, y: P.y - 34, txt: words[(Math.random()*words.length)|0], col: suit.web, l: 0.55 });
 }
+
 function release(){
-  if (anchor){ P.vx*=1.08; P.vy-=60; }
-  anchor=null; holding=false;
+  if (anchor){ P.vx *= 1.08; P.vy -= 65; }
+  anchor = null; holding = false;
 }
-addEventListener('keydown', e=>{
-  if (e.code==='Space'||e.code==='ArrowUp'){ e.preventDefault(); if(e.repeat)return; if(state==='menu'||(state==='over'&&time-overAt>0.8)){start();} else attach(); }
+
+addEventListener('keydown', e => {
+  if (e.code === 'Digit1') { setSuit(0); return; }
+  if (e.code === 'Digit2') { setSuit(1); return; }
+  if (e.code === 'Digit3') { setSuit(2); return; }
+  if (e.code === 'Digit4') { setSuit(3); return; }
+  if (e.code === 'KeyM')   { setMapMode(mapMode === '3d' ? '2d' : '3d'); return; }
+  if (e.code === 'Space' || e.code === 'ArrowUp'){
+    e.preventDefault();
+    if (e.repeat) return;
+    if (state === 'menu' || (state === 'over' && time - overAt > 0.6)) start();
+    else attach();
+  }
 });
-addEventListener('keyup', e=>{ if (e.code==='Space'||e.code==='ArrowUp') release(); });
-cv.addEventListener('pointerdown', ()=>{ if(state==='menu'||(state==='over'&&time-overAt>0.8)) start(); else attach(); });
+addEventListener('keyup', e => { if (e.code === 'Space' || e.code === 'ArrowUp') release(); });
+cv.addEventListener('pointerdown', () => {
+  if (state === 'menu' || (state === 'over' && time - overAt > 0.6)) start();
+  else attach();
+});
 addEventListener('pointerup', release);
-function start(){ const b=best; reset(); state='play'; }
 
-function burst(x,y,n,col){ for(let i=0;i<n;i++) particles.push({x,y,vx:(Math.random()-.5)*300,vy:(Math.random()-.5)*300,l:.5,c:col}); }
-
-// ---- update ----
-function update(dt){
-  if (state==='menu') cam.x += 80*dt;
-  if (state!=='play') { time+=dt; particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt;}); particles=particles.filter(p=>p.l>0); shake=Math.max(0,shake-dt); return; }
-  time+=dt;
-  // physics
-  if (holding && !anchor) attach();
-  P.vy += GRAV*dt;
-  P.x += P.vx*dt; P.y += P.vy*dt;
-  if (anchor){
-    let dx=P.x-anchor.x, dy=P.y-anchor.y, d=Math.hypot(dx,dy);
-    if (d>ropeLen){
-      const nx=dx/d, ny=dy/d;
-      P.x = anchor.x+nx*ropeLen; P.y = anchor.y+ny*ropeLen;
-      const vn = P.vx*nx+P.vy*ny;
-      if (vn>0){ P.vx-=nx*vn; P.vy-=ny*vn; }
-    }
-    // keep pushing forward a bit while swinging
-    P.vx += 70*dt;
-    if (P.x > anchor.x + 60) { P.vx*=1.06; P.vy-=60; anchor=null; combo++; score+=10; }
-  } else P.vx += (240-P.vx)*0.15*dt; // drift toward cruising speed
-  P.vx = Math.max(150, Math.min(650, P.vx));
-  P.ang = Math.atan2(P.vy, Math.max(P.vx,1))*0.7;
-  const gy = H-GROUND-20;
-  if (P.y>gy){ // hit street: lose combo, scuff along
-    if (P.vy>350){ shake=.25; burst(P.x,gy+20,10,'#999'); combo=0; }
-    P.y=gy; P.vy=-Math.abs(P.vy)*0.3; P.vx=Math.max(150,P.vx*0.9); if(!holding) anchor=null;
-  }
-  if (P.y<10){ P.y=10; P.vy=Math.max(P.vy,0); }
-  // camera: Spidey stays at 35% of the screen; world scrolls past
-  cam.x += (P.x - W*0.35 - cam.x)*Math.min(1,dt*8);
-  // tokens
-  while (tokens.length<8){
-    const lastX = tokens.length? tokens[tokens.length-1].x : P.x+400;
-    tokens.push({x:lastX+200+Math.random()*250, y: 80+Math.random()*(H-GROUND-250)});
-  }
-  tokens = tokens.filter(t=>{
-    const ts=screenOf(t.x,t.y), ps=screenOf(P.x,P.y);
-    if (Math.hypot(ts.x-ps.x,ts.y-ps.y)<36){ score+=50*(1+combo); combo++; burst(t.x,t.y,10,'#ffd400'); return false; }
-    return t.x > cam.x-100;
-  });
-  // traffic
-  if (Math.random()<dt*0.9) cars.push({x:cam.x+W+200, v:-(100+Math.random()*120), col:['#c8102e','#222','#e8e8e8','#2457c5'][Math.random()*4|0], tram:Math.random()<.2, lane:Math.random()<.5?0:1});
-  cars.forEach(c=>c.x+=c.v*dt);
-  cars = cars.filter(c=>c.x>cam.x-400);
-  const sp=screenOf(P.x,P.y);
-  for (const c of cars){
-    const cs=screenOf(c.x, H-GROUND-20), cw=c.tram?170:70, ch=c.tram?40:34;
-    const hit = sp.x+14>cs.x-6 && sp.x-14<cs.x+cw+6 && sp.y+26>cs.y-ch && sp.y-18<cs.y+8;
-    if (hit){
-      state='over'; overAt=time; shake=.6; burst(P.x,P.y,40,'#d41f2b'); burst(P.x,P.y,20,'#ffd400');
-      anchor=null; holding=false; P.vx*=0.2; P.vy=0; return;
-    }
-  }
-  score += P.vx*dt*0.02;
-  particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt;}); particles=particles.filter(p=>p.l>0);
-  shake=Math.max(0,shake-dt);
-}
-
-// ---- drawing ----
-const PAL = [['#1a2a4a','#2d4a7a'],['#4a1a1a','#7a2d2d'],['#2a2a3a','#4a4a66'],['#1f3a3a','#336666'],['#3a2a1a','#6a4a2a']];
-
-function drawSky(){
-  const g = ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,'#0b1030'); g.addColorStop(.45,'#5b1a4a'); g.addColorStop(.75,'#e0503a'); g.addColorStop(1,'#ffb347');
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  // sun
-  ctx.fillStyle='rgba(255,210,120,.35)'; ctx.beginPath(); ctx.arc(W*0.8,H*0.62,90,0,7); ctx.fill();
-  // stars
-  ctx.fillStyle='rgba(255,255,255,.7)';
-  for(let i=0;i<60;i++) ctx.fillRect((rnd(i)*W*1.3 - cam.x*0.02)%W+ (W), rnd(i+50)*H*0.35, 2,2);
-}
-
-function farLayer(par, base, col, seed, hmax, wmin){
-  ctx.fillStyle=col;
-  const off = cam.x*par;
-  let x = -((off)%1000)-1000; 
-  const start = Math.floor(off/60)*60-60;
-  for (let wx=start; wx<off+W+200; wx+=60){
-    const i = Math.floor(wx/60);
-    const h = 40 + rnd(i+seed)*hmax;
-    ctx.fillRect(wx-off, base-h, 60-2+ (rnd(i+seed+3)>.5?wmin:0), h);
+function updateOverlayUI(){
+  const card = document.getElementById('overlayCard');
+  const title = document.getElementById('ovTitle');
+  const sub = document.getElementById('ovSub');
+  const btn = document.getElementById('ovBtn');
+  if (state === 'play'){
+    card.classList.add('hidden');
+  } else if (state === 'over'){
+    card.classList.remove('hidden');
+    title.textContent = 'CRASHED ON QUEEN!';
+    sub.textContent = `Clipped a vehicle near ${curStreet()} in the ${SUITS[suitIdx].name} suit. Score ${Math.floor(score)} • Best ${Math.floor(best)}.`;
+    btn.textContent = 'SWING AGAIN [SPACE]';
+  } else {
+    card.classList.remove('hidden');
+    title.textContent = 'SPIDEY: TORONTO SWING';
+    sub.textContent = 'Whip across Queen Street West over live OpenStreetMap blocks, 3D Toronto skyscrapers, the CN Tower, and TTC 501 streetcars.';
+    btn.textContent = 'LAUNCH WEB SWING [SPACE]';
   }
 }
 
-function drawCN(sx, base, scale, col){
-  ctx.fillStyle=col;
-  const h=520*scale;
-  ctx.beginPath(); ctx.moveTo(sx-10*scale,base); ctx.lineTo(sx-3*scale,base-h*0.55); ctx.lineTo(sx-2*scale,base-h); ctx.lineTo(sx+2*scale,base-h); ctx.lineTo(sx+3*scale,base-h*0.55); ctx.lineTo(sx+10*scale,base); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(sx,base-h*0.58,34*scale,9*scale,0,0,7); ctx.fill();
-  ctx.fillRect(sx-14*scale,base-h*0.62,28*scale,8*scale);
-  ctx.beginPath(); ctx.ellipse(sx,base-h*0.7,10*scale,4*scale,0,0,7); ctx.fill();
+function start(){
+  reset();
+  state = 'play';
+  updateOverlayUI();
+  attach();
 }
 
-function drawFarLandmarks(){
-  const par = 0.18, base = H-GROUND-10;
-  // wrap landmarks over the repeating route
-  for (let k=-1;k<=1;k++){
-    const wrap = Math.floor((cam.x*par)/(ROUTE_LEN*par))*ROUTE_LEN*par + k*ROUTE_LEN*par;
-    const cn = CN_X*par + wrap - cam.x*par;
-    const rg = ROGERS_X*par + wrap - cam.x*par;
-    const ch = CITYHALL_X*par + wrap - cam.x*par;
-    if (cn>-200&&cn<W+200){ drawCN(cn, base-60, 1, '#1b1c3c'); }
-    if (rg>-300&&rg<W+300){ // Rogers Centre dome
-      ctx.fillStyle='#1b1c3c'; ctx.beginPath(); ctx.ellipse(rg,base-60,90,55,0,Math.PI,0); ctx.fill(); ctx.fillRect(rg-90,base-60,180,40);
-    }
-    if (ch>-300&&ch<W+300){ // Toronto City Hall twin curved towers
-      ctx.fillStyle='#232549';
-      ctx.beginPath(); ctx.moveTo(ch-70,base-40); ctx.quadraticCurveTo(ch-80,base-150,ch-40,base-260); ctx.lineTo(ch-20,base-260); ctx.quadraticCurveTo(ch-45,base-150,ch-40,base-40); ctx.fill();
-      ctx.beginPath(); ctx.moveTo(ch+70,base-40); ctx.quadraticCurveTo(ch+80,base-120,ch+40,base-200); ctx.lineTo(ch+20,base-200); ctx.quadraticCurveTo(ch+45,base-120,ch+40,base-40); ctx.fill();
-      ctx.beginPath(); ctx.ellipse(ch,base-40,28,34,0,Math.PI,0); ctx.fill();
-    }
-  }
-}
-
-function drawBuildings(){
-  const i0 = Math.floor(cam.x/CELL)-1, i1 = Math.ceil((cam.x+W)/CELL)+1;
-  const gy = H-GROUND;
-  for (let i=i0;i<=i1;i++){
-    const b = bld(i); if(!b) continue;
-    const x = b.x-cam.x, y = gy-b.h, pal=PAL[b.hue];
-    const g = ctx.createLinearGradient(x,0,x+b.w,0); g.addColorStop(0,pal[1]); g.addColorStop(1,pal[0]);
-    ctx.fillStyle=g; ctx.fillRect(x,y,b.w,b.h);
-    ctx.fillStyle='rgba(0,0,0,.35)'; ctx.fillRect(x,y,b.w,6);
-    // windows
-    for (let wy=y+18; wy<gy-40; wy+=22) for (let wx=x+10; wx<x+b.w-14; wx+=20){
-      const lit = rnd(i*131+wy*0.37+wx*0.11+b.win)>.55;
-      ctx.fillStyle = lit?'rgba(255,220,130,.85)':'rgba(10,15,30,.7)';
-      ctx.fillRect(wx,wy,10,13);
-    }
-    // storefront
-    ctx.fillStyle='rgba(255,200,120,.5)'; ctx.fillRect(x+6,gy-34,b.w-12,26);
-    ctx.fillStyle = ['#c8102e','#ffd400','#2457c5','#1f9d55'][(i&3)]; ctx.fillRect(x+6,gy-38,b.w-12,5);
-    // rooftop details
-    if (rnd(i+21)>.6){ ctx.fillStyle='#111'; ctx.fillRect(x+b.w*0.3,y-16,16,16); }
-    if (rnd(i+22)>.8){ ctx.fillStyle='#111'; ctx.fillRect(x+b.w*0.6,y-40,3,40); ctx.fillStyle='#f33'; ctx.fillRect(x+b.w*0.6-1,y-42,5,4); }
-  }
-  // street signs at cross streets
-  const b0 = Math.floor(cam.x/STREET_LEN)-1, b1 = Math.ceil((cam.x+W)/STREET_LEN)+1;
-  for (let s=b0;s<=b1;s++){
-    const sx = (s*STREET_LEN + (BLOCK-1)*CELL + CELL/2) - cam.x;
-    const name = STREETS[((s%STREETS.length)+STREETS.length)%STREETS.length];
-    // the street at the end of block s
-    ctx.fillStyle='#0a6b3a'; ctx.fillRect(sx-62,gy-150,124,26);
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(sx-60,gy-148,120,22);
-    ctx.fillStyle='#fff'; ctx.font='bold 13px Arial'; ctx.textAlign='center'; ctx.fillText(name,sx,gy-131);
-    ctx.fillStyle='#555'; ctx.fillRect(sx-2,gy-124,4,124);
-    // traffic light
-    ctx.fillStyle='#222'; ctx.fillRect(sx+40,gy-90,10,28); ctx.fillStyle=(Math.floor(time*0.5+s)%2)?'#2f2':'#f22'; ctx.beginPath(); ctx.arc(sx+45,gy-84,3,0,7); ctx.fill();
-  }
-}
-
-function drawStreetSigns(){
-  const gy=H-GROUND;
-  const b0 = Math.floor(cam.x/STREET_LEN)-1, b1 = Math.ceil((cam.x+W)/STREET_LEN)+1;
-  for (let s=b0;s<=b1;s++){
-    const worldX = s*STREET_LEN + (BLOCK-1)*CELL + CELL/2;
-    const sx = screenOf(worldX, H-GROUND-20).x;
-    const name = STREETS[((s%STREETS.length)+STREETS.length)%STREETS.length];
-    ctx.fillStyle='#0a6b3a'; ctx.fillRect(sx-62,gy-150,124,26);
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(sx-60,gy-148,120,22);
-    ctx.fillStyle='#fff'; ctx.font='bold 13px Arial'; ctx.textAlign='center'; ctx.fillText(name,sx,gy-131);
-    ctx.fillStyle='#555'; ctx.fillRect(sx-2,gy-124,4,124);
-    ctx.fillStyle='#222'; ctx.fillRect(sx+40,gy-90,10,28);
-    ctx.fillStyle=(Math.floor(time*0.5+s)%2)?'#2f2':'#f22';
-    ctx.beginPath(); ctx.arc(sx+45,gy-84,3,0,7); ctx.fill();
-  }
-}
-
-function drawStreet(){
-  cars.forEach(c=>{
-    const p=screenOf(c.x, H-GROUND-20), x=p.x, y=p.y+(c.lane?18:0);
-    if (c.tram){
-      ctx.fillStyle='#da291c'; ctx.fillRect(x,y-34,170,36);
-      ctx.fillStyle='#fff'; ctx.fillRect(x,y-14,170,4);
-      ctx.fillStyle='#9fd4ff'; for(let k=0;k<6;k++) ctx.fillRect(x+8+k*27,y-28,20,12);
-      ctx.fillStyle='#fff'; ctx.font='bold 9px Arial'; ctx.textAlign='left'; ctx.fillText('TTC 501',x+6,y-2);
-      ctx.strokeStyle='#444'; ctx.beginPath(); ctx.moveTo(x+85,y-34); ctx.lineTo(x+95,y-70); ctx.stroke();
-    } else {
-      ctx.fillStyle=c.col; ctx.fillRect(x,y-18,70,18); ctx.fillRect(x+14,y-30,40,14);
-      ctx.fillStyle='#9fd4ff'; ctx.fillRect(x+18,y-28,14,10); ctx.fillRect(x+34,y-28,14,10);
-      ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(x+14,y,6,0,7); ctx.arc(x+56,y,6,0,7); ctx.fill();
-    }
+function burst(x,y,n,col){
+  for(let i=0;i<n;i++) particles.push({
+    x, y,
+    vx:(Math.random()-.5)*340,
+    vy:(Math.random()-.5)*340,
+    l: 0.45 + Math.random()*0.25,
+    c: col
   });
 }
 
-function drawWeb(){
-  if (!anchor) return;
-  const a=screenOf(anchor.x, anchor.y), p=screenOf(P.x, P.y);
-  ctx.strokeStyle='rgba(255,255,255,.95)'; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.moveTo(p.x,p.y-6); ctx.lineTo(a.x,a.y); ctx.stroke();
-  ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=5;
-  ctx.beginPath(); ctx.moveTo(p.x,p.y-6); ctx.lineTo(a.x,a.y); ctx.stroke();
-}
-
-function drawSpidey(){
-  const sp=screenOf(P.x,P.y), x=sp.x, y=sp.y;
-  ctx.save(); ctx.translate(x,y);
-  const swing = !!anchor;
-  ctx.rotate(swing ? Math.atan2(anchor.x-P.x, -(anchor.y-P.y))*0.8 : P.ang);
-  // legs
-  ctx.lineCap='round';
-  const run = Math.sin(time*14)*0.6;
-  ctx.strokeStyle='#1a2c8f'; ctx.lineWidth=7;
-  ctx.beginPath(); ctx.moveTo(0,8); ctx.lineTo(swing?-14:-10+run*6,24); ctx.moveTo(0,8); ctx.lineTo(swing?10:10-run*6,24); ctx.stroke();
-  // torso
-  ctx.fillStyle='#d41f2b'; ctx.beginPath(); ctx.ellipse(0,0,10,16,0,0,7); ctx.fill();
-  ctx.fillStyle='#1a2c8f'; ctx.fillRect(-9,6,18,8);
-  // arms
-  ctx.strokeStyle='#d41f2b'; ctx.lineWidth=6;
-  ctx.beginPath(); ctx.moveTo(0,-8); ctx.lineTo(swing?8:16,swing?-26:-2); ctx.moveTo(0,-8); ctx.lineTo(-14,swing?4:2); ctx.stroke();
-  // spider emblem
-  ctx.fillStyle='#111'; ctx.beginPath(); ctx.ellipse(0,-2,2.5,5,0,0,7); ctx.fill();
-  // head
-  ctx.fillStyle='#d41f2b'; ctx.beginPath(); ctx.arc(0,-22,10,0,7); ctx.fill();
-  ctx.fillStyle='#fff'; ctx.beginPath(); ctx.ellipse(-4,-23,4,2.6,-.3,0,7); ctx.ellipse(4,-23,4,2.6,.3,0,7); ctx.fill();
-  ctx.strokeStyle='rgba(0,0,0,.5)'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(0,-32); ctx.lineTo(0,-14); ctx.stroke();
-  ctx.restore();
-}
-
-function drawTokens(){
-  tokens.forEach(t=>{
-    const p=screenOf(t.x,t.y), x=p.x, y=p.y+Math.sin(time*4+t.x)*4;
-    ctx.strokeStyle='#ffd400'; ctx.lineWidth=2; ctx.fillStyle='rgba(255,212,0,.25)';
-    ctx.beginPath(); ctx.arc(x,y,16,0,7); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); for(let k=0;k<6;k++){const a=k*Math.PI/3; ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(a)*14,y+Math.sin(a)*14);} ctx.stroke();
-  });
-}
-
-// Official OpenStreetMap raster tiles, drawn 1:1 (not stretched) along Queen St W.
-const Z=16, ZCITY=16;
-const PTS=[
+// ---- Real OpenStreetMap tiles along Queen St W ----
+const Z = 16, ZCITY = 16;
+const PTS = [
   {lon:-79.4112,lat:43.6433},{lon:-79.4074,lat:43.6435},{lon:-79.3955,lat:43.6487},
   {lon:-79.3900,lat:43.6496},{lon:-79.3864,lat:43.6504},{lon:-79.3832,lat:43.6515},
   {lon:-79.3791,lat:43.6525},{lon:-79.3747,lat:43.6529},{lon:-79.3715,lat:43.6535},
   {lon:-79.3678,lat:43.6541},{lon:-79.3641,lat:43.6549},{lon:-79.3563,lat:43.6566}
 ];
-const txz=(lon,z)=>(lon+180)/360*2**z;
-const tyz=(lat,z)=>(1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*2**z;
-const tx=(lon)=>txz(lon,Z), ty=(lat)=>tyz(lat,Z);
-const tiles={};
+const txz = (lon,z) => (lon+180)/360*2**z;
+const tyz = (lat,z) => (1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*2**z;
+const tiles = {};
 function tileAt(z,x,y){
-  const k=z+'/'+x+'/'+y; if(tiles[k]) return tiles[k];
-  const im=new Image();
-  im.src='https://tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png';
-  return tiles[k]=im;
+  const k = z+'/'+x+'/'+y;
+  if (tiles[k]) return tiles[k];
+  const im = new Image();
+  im.src = 'https://tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png';
+  return tiles[k] = im;
 }
-function tile(x,y){ return tileAt(Z,x,y); }
 function routeGeo(wx){
-  const f=((wx%ROUTE_LEN)+ROUTE_LEN)%ROUTE_LEN/ROUTE_LEN;
-  const t=f*(PTS.length-1), i=Math.min(PTS.length-2, t|0), u=t-i;
-  return {lon:PTS[i].lon+(PTS[i+1].lon-PTS[i].lon)*u, lat:PTS[i].lat+(PTS[i+1].lat-PTS[i].lat)*u};
+  const f = ((wx%ROUTE_LEN)+ROUTE_LEN)%ROUTE_LEN/ROUTE_LEN;
+  const t = f*(PTS.length-1), i = Math.min(PTS.length-2, t|0), u = t-i;
+  return { lon: PTS[i].lon+(PTS[i+1].lon-PTS[i].lon)*u, lat: PTS[i].lat+(PTS[i+1].lat-PTS[i].lat)*u };
 }
 function mapOrigin(){
-  const g=routeGeo(cam.x+W*0.35);
-  return {ox:W*0.35-txz(g.lon,ZCITY)*256, oy:(H-GROUND-20)-tyz(g.lat,ZCITY)*256};
+  const g = routeGeo(cam.x + W*0.35);
+  return { ox: W*0.35 - txz(g.lon,ZCITY)*256, oy: (H-GROUND-20) - tyz(g.lat,ZCITY)*256 };
 }
 function screenOf(wx, wy){
-  const o=mapOrigin(), g=routeGeo(wx);
-  const streetY=o.oy+tyz(g.lat,ZCITY)*256;
-  return {x:o.ox+txz(g.lon,ZCITY)*256, y:streetY-((H-GROUND-20)-wy)};
+  return { x: wx - cam.x, y: wy };
 }
-function drawCityMap(){
-  const o=mapOrigin(), z=ZCITY;
-  ctx.fillStyle='#f2efe9'; ctx.fillRect(0,0,W,H);
-  const i0=Math.floor(-o.ox/256)-1, i1=Math.floor((W-o.ox)/256)+1;
-  const j0=Math.floor(-o.oy/256)-1, j1=Math.floor((H-o.oy)/256)+1;
-  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
-    const im=tileAt(z,i,j);
-    if(im.complete&&im.naturalWidth) ctx.drawImage(im, o.ox+i*256, o.oy+j*256);
+
+// ---- Physics & Game Loop Update ----
+function update(dt){
+  if (state === 'menu') {
+    time += dt;
+    cam.x += 95*dt;
+    P.x = cam.x + W*0.35;
+    P.y = H*0.36 + Math.sin(time*2.5)*18;
+    return;
   }
-  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillRect(8,H-22,210,16);
-  ctx.fillStyle='#333'; ctx.font='11px Arial'; ctx.textAlign='left';
-  ctx.fillText('© OpenStreetMap contributors',12,H-10);
-}
-function drawMinimap(){
-  const w=300,h=190,x=W-w-16,y=16, z=14;
-  const g=routeGeo(P.x), pxT=txz(g.lon,z), cyT=tyz(g.lat,z);
-  ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
-  ctx.fillStyle='#e9e4d8'; ctx.fillRect(x,y,w,h);
-  const ox=x+w/2-pxT*256, oy=y+h/2-cyT*256;
-  for(let i=Math.floor(pxT-w/512)-1;i<=Math.floor(pxT+w/512)+1;i++)
-    for(let j=Math.floor(cyT-h/512)-1;j<=Math.floor(cyT+h/512)+1;j++){
-      const im=tileAt(z,i,j); if(im.complete&&im.naturalWidth) ctx.drawImage(im,ox+i*256,oy+j*256);
+  if (state !== 'play') {
+    time += dt;
+    particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt;});
+    particles = particles.filter(p=>p.l>0);
+    popups.forEach(p=>{p.y-=35*dt;p.l-=dt;});
+    popups = popups.filter(p=>p.l>0);
+    shake = Math.max(0, shake-dt);
+    return;
+  }
+  time += dt;
+  if (holding && !anchor) attach();
+  P.vy += GRAV*dt;
+  P.x += P.vx*dt; P.y += P.vy*dt;
+
+  if (anchor){
+    let dx = P.x - anchor.x, dy = P.y - anchor.y, d = Math.hypot(dx,dy);
+    if (d > ropeLen){
+      const nx = dx/d, ny = dy/d;
+      P.x = anchor.x + nx*ropeLen; P.y = anchor.y + ny*ropeLen;
+      const vn = P.vx*nx + P.vy*ny;
+      if (vn > 0){ P.vx -= nx*vn; P.vy -= ny*vn; }
     }
-  ctx.strokeStyle='rgba(212,31,43,.9)'; ctx.lineWidth=3;
-  ctx.beginPath();
-  PTS.forEach((p,i)=>{ const sx=ox+txz(p.lon,z)*256, sy=oy+tyz(p.lat,z)*256; i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy); });
-  ctx.stroke();
-  ctx.fillStyle='#d41f2b'; ctx.strokeStyle='#fff'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(x+w/2,y+h/2,6,0,7); ctx.fill(); ctx.stroke();
+    P.vx += 75*dt;
+    if (P.x > anchor.x + 62){
+      P.vx *= 1.06; P.vy -= 62; anchor = null; combo++; score += 15;
+    }
+  } else {
+    P.vx += (250 - P.vx)*0.15*dt;
+  }
+  P.vx = Math.max(160, Math.min(660, P.vx));
+  P.ang = Math.atan2(P.vy, Math.max(P.vx,1))*0.65;
+
+  const gy = H - GROUND - 20;
+  if (P.y > gy){
+    if (P.vy > 340){ shake = 0.25; burst(P.x, gy+16, 10, '#94A3B8'); combo = 0; }
+    P.y = gy; P.vy = -Math.abs(P.vy)*0.32; P.vx = Math.max(160, P.vx*0.9);
+    if (!holding) anchor = null;
+  }
+  if (P.y < 24){ P.y = 24; P.vy = Math.max(P.vy, 0); }
+
+  cam.x += (P.x - W*0.35 - cam.x)*Math.min(1, dt*8.5);
+
+  // Motion ribbon trail
+  trail.push({ x: P.x, y: P.y - 6, t: time });
+  while (trail.length > 22) trail.shift();
+
+  // Collectible Spider-Tokens
+  while (tokens.length < 9){
+    const lastX = tokens.length ? tokens[tokens.length-1].x : P.x + 360;
+    tokens.push({ x: lastX + 190 + Math.random()*240, y: 90 + Math.random()*(H - GROUND - 240) });
+  }
+  tokens = tokens.filter(t => {
+    if (Math.hypot(t.x - P.x, t.y - P.y) < 38){
+      const pts = 50 * (1 + combo);
+      score += pts; combo++;
+      burst(t.x, t.y, 14, '#FFD600');
+      popups.push({ x: t.x, y: t.y - 16, txt: '+' + pts, col: '#FFD600', l: 0.65 });
+      return false;
+    }
+    return t.x > cam.x - 120;
+  });
+
+  // Queen St W Traffic & TTC 501 Streetcars
+  if (Math.random() < dt*0.88){
+    cars.push({
+      x: cam.x + W + 220,
+      v: -(105 + Math.random()*125),
+      col: ['#FF1744','#00E5FF','#FFD600','#F8FAFC'][Math.random()*4|0],
+      tram: Math.random() < 0.24,
+      lane: Math.random() < 0.5 ? 0 : 1
+    });
+  }
+  cars.forEach(c => c.x += c.v*dt);
+  cars = cars.filter(c => c.x > cam.x - 420);
+
+  // Vehicle Collision Check -> Game Over
+  const sp = screenOf(P.x, P.y);
+  for (const c of cars){
+    const cs = screenOf(c.x, H - GROUND - 20 + (c.lane ? 22 : 0));
+    const cw = c.tram ? 176 : 74, ch = c.tram ? 42 : 32;
+    const hit = sp.x + 13 > cs.x - 4 && sp.x - 13 < cs.x + cw + 4 && sp.y + 24 > cs.y - ch && sp.y - 18 < cs.y + 6;
+    if (hit){
+      state = 'over'; overAt = time; shake = 0.65;
+      burst(P.x, P.y, 45, '#FF1744');
+      burst(P.x, P.y, 25, '#FFD600');
+      popups.push({ x: P.x, y: P.y - 30, txt: 'WHAM!', col: '#FF1744', l: 1.1 });
+      anchor = null; holding = false; P.vx *= 0.2; P.vy = 0;
+      updateOverlayUI();
+      return;
+    }
+  }
+
+  score += P.vx*dt*0.022;
+  particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt;});
+  particles = particles.filter(p=>p.l>0);
+  popups.forEach(p=>{p.y-=35*dt;p.l-=dt;});
+  popups = popups.filter(p=>p.l>0);
+  shake = Math.max(0, shake-dt);
+}
+
+// ---- Drawing: 3D Perspective City + OpenStreetMap + Spider-Verse Styling ----
+function drawSkyAndLandmarks(horizonY){
+  const g = ctx.createLinearGradient(0, 0, 0, horizonY);
+  g.addColorStop(0, '#050611');
+  g.addColorStop(0.45, '#190B2E');
+  g.addColorStop(0.8, '#590D3B');
+  g.addColorStop(1, '#FF2A54');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, horizonY);
+
+  // Comic sunset sun with halftone rings
+  const sunX = W * 0.76, sunY = horizonY * 0.66;
+  const sg = ctx.createRadialGradient(sunX, sunY, 10, sunX, sunY, 140);
+  sg.addColorStop(0, 'rgba(255, 214, 0, 0.9)');
+  sg.addColorStop(0.45, 'rgba(255, 23, 68, 0.55)');
+  sg.addColorStop(1, 'rgba(255, 23, 68, 0)');
+  ctx.fillStyle = sg;
+  ctx.beginPath(); ctx.arc(sunX, sunY, 140, 0, 7); ctx.fill();
+
+  // Distant silhouette skyline
+  const par = 0.16;
+  const off = cam.x * par;
+  const start = Math.floor(off/56)*56 - 56;
+  ctx.fillStyle = '#0D0821';
+  for (let wx = start; wx < off + W + 160; wx += 56){
+    const i = Math.floor(wx/56);
+    const h = 45 + rnd(i+17)*150;
+    ctx.fillRect(wx - off, horizonY - h, 53, h);
+  }
+
+  // Iconic Toronto Landmarks: CN Tower, Rogers Centre, City Hall
+  for (let k = -1; k <= 1; k++){
+    const wrap = Math.floor((cam.x*par)/(ROUTE_LEN*par))*ROUTE_LEN*par + k*ROUTE_LEN*par;
+    const cn = CN_X*par + wrap - cam.x*par;
+    const rg = ROGERS_X*par + wrap - cam.x*par;
+    const ch = CITYHALL_X*par + wrap - cam.x*par;
+
+    if (cn > -200 && cn < W + 200){
+      const h = Math.min(horizonY * 0.88, 360);
+      ctx.fillStyle = '#120E2E';
+      ctx.strokeStyle = '#00E5FF';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cn-11, horizonY); ctx.lineTo(cn-3.5, horizonY-h*0.58);
+      ctx.lineTo(cn-1.5, horizonY-h); ctx.lineTo(cn+1.5, horizonY-h);
+      ctx.lineTo(cn+3.5, horizonY-h*0.58); ctx.lineTo(cn+11, horizonY);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      // SkyPod
+      ctx.fillStyle = '#FF1744';
+      ctx.beginPath(); ctx.ellipse(cn, horizonY-h*0.62, 26, 7, 0, 0, 7); ctx.fill();
+      ctx.strokeStyle = '#FFFFFF'; ctx.stroke();
+      // Beacon
+      if (Math.floor(time*3)%2===0){
+        ctx.fillStyle = '#00E5FF';
+        ctx.beginPath(); ctx.arc(cn, horizonY-h-4, 4, 0, 7); ctx.fill();
+      }
+    }
+    if (rg > -240 && rg < W + 240){
+      ctx.fillStyle = '#141030';
+      ctx.beginPath(); ctx.ellipse(rg, horizonY, 78, 42, 0, Math.PI, 0); ctx.fill();
+      ctx.strokeStyle = 'rgba(0,229,255,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+    if (ch > -240 && ch < W + 240){
+      ctx.fillStyle = '#161233';
+      ctx.fillRect(ch-44, horizonY-135, 22, 135);
+      ctx.fillRect(ch+22, horizonY-110, 22, 110);
+      ctx.fillStyle = '#00E5FF';
+      ctx.beginPath(); ctx.ellipse(ch, horizonY-18, 24, 10, 0, 0, 7); ctx.fill();
+    }
+  }
+}
+
+function drawMapPlane(topY){
+  const o = mapOrigin(), z = ZCITY;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0, topY, W, H - topY); ctx.clip();
+
+  ctx.fillStyle = '#101528';
+  ctx.fillRect(0, topY, W, H - topY);
+
+  const i0 = Math.floor(-o.ox/256)-1, i1 = Math.floor((W-o.ox)/256)+1;
+  const j0 = Math.floor((topY-o.oy)/256)-1, j1 = Math.floor((H-o.oy)/256)+1;
+  for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++){
+    const im = tileAt(z, i, j);
+    if (im.complete && im.naturalWidth) ctx.drawImage(im, o.ox + i*256, o.oy + j*256);
+  }
+
+  if (mapMode === '3d'){
+    // Stylized Spider-Verse neon glaze over real OpenStreetMap ground plane
+    const tint = ctx.createLinearGradient(0, topY, 0, H);
+    tint.addColorStop(0, 'rgba(7, 9, 22, 0.85)');
+    tint.addColorStop(0.25, 'rgba(13, 18, 40, 0.42)');
+    tint.addColorStop(1, 'rgba(9, 12, 28, 0.58)');
+    ctx.fillStyle = tint;
+    ctx.fillRect(0, topY, W, H - topY);
+
+    // Perspective street grid lines tying 3D buildings to map
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.22)';
+    ctx.lineWidth = 1;
+    const roadY = H - GROUND;
+    ctx.beginPath();
+    ctx.moveTo(0, roadY); ctx.lineTo(W, roadY);
+    ctx.moveTo(0, roadY + 38); ctx.lineTo(W, roadY + 38);
+    ctx.stroke();
+  }
+
+  // Crisp OSM attribution badge
+  ctx.fillStyle = 'rgba(7, 8, 18, 0.82)';
+  ctx.fillRect(10, H - 24, 195, 18);
+  ctx.fillStyle = '#CBD5E1'; ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('© OpenStreetMap contributors', 16, H - 11);
   ctx.restore();
-  ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(x,y,w,h);
+}
+
+function draw3DBuildings(){
+  const i0 = Math.floor(cam.x/CELL) - 1, i1 = Math.ceil((cam.x + W)/CELL) + 1;
+  const gy = H - GROUND;
+
+  for (let i = i0; i <= i1; i++){
+    const b = bld(i); if (!b) continue;
+    const x = b.x - cam.x, y = gy - b.h;
+    if (mapMode === '2d'){
+      // In 2D map mode, draw subtle rooftop anchor target ledges so player sees where webs attach
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.45)';
+      ctx.strokeStyle = '#00E5FF';
+      ctx.lineWidth = 2;
+      ctx.fillRect(x, y, b.w, 10);
+      ctx.strokeRect(x, y, b.w, 10);
+      continue;
+    }
+
+    // 3D Oblique Extrusion perspective shifted from screen center
+    const centerFactor = ((x + b.w*0.5) - W*0.45) / W;
+    const dx = -centerFactor * b.depth * 1.15 + 22;
+    const dy = -b.depth * 0.52;
+
+    // 1. 3D Roof Polygon
+    ctx.fillStyle = b.pal.roof;
+    ctx.strokeStyle = b.pal.neon;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + dx, y + dy);
+    ctx.lineTo(x + b.w + dx, y + dy);
+    ctx.lineTo(x + b.w, y);
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    // 2. 3D Side Wall Extrusion
+    ctx.fillStyle = b.pal.side;
+    ctx.beginPath();
+    if (dx >= 0){
+      ctx.moveTo(x + b.w, y);
+      ctx.lineTo(x + b.w + dx, y + dy);
+      ctx.lineTo(x + b.w + dx, gy + dy);
+      ctx.lineTo(x + b.w, gy);
+    } else {
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + dx, y + dy);
+      ctx.lineTo(x + dx, gy + dy);
+      ctx.lineTo(x, gy);
+    }
+    ctx.closePath();
+    ctx.fill(); ctx.stroke();
+
+    // 3. Front Facade
+    ctx.fillStyle = b.pal.front;
+    ctx.fillRect(x, y, b.w, b.h);
+    ctx.strokeStyle = '#050711';
+    ctx.lineWidth = 2.5;
+    ctx.strokeRect(x, y, b.w, b.h);
+
+    // Neon cornice edge
+    ctx.fillStyle = b.pal.neon;
+    ctx.fillRect(x, y, b.w, 4);
+
+    // Illuminated high-rise windows
+    for (let wy = y + 16; wy < gy - 42; wy += 22){
+      for (let wx = x + 10; wx < x + b.w - 14; wx += 18){
+        const lit = rnd(i*131 + wy*0.37 + wx*0.11 + b.winSeed) > 0.52;
+        ctx.fillStyle = lit ? b.pal.win : 'rgba(6, 9, 20, 0.72)';
+        ctx.fillRect(wx, wy, 10, 13);
+      }
+    }
+
+    // Vertical comic billboard sign
+    if (b.sign){
+      ctx.fillStyle = b.pal.neon;
+      ctx.fillRect(x + b.w - 22, y + 26, 16, 76);
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5;
+      ctx.strokeRect(x + b.w - 22, y + 26, 16, 76);
+      ctx.save();
+      ctx.translate(x + b.w - 14, y + 64);
+      ctx.rotate(-Math.PI/2);
+      ctx.fillStyle = '#060814';
+      ctx.font = '900 10px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(b.sign, 0, 3);
+      ctx.restore();
+    }
+
+    // Queen St W Storefront awning
+    ctx.fillStyle = b.pal.neon;
+    ctx.fillRect(x + 6, gy - 34, b.w - 12, 6);
+    ctx.fillStyle = 'rgba(255, 238, 170, 0.35)';
+    ctx.fillRect(x + 6, gy - 28, b.w - 12, 22);
+  }
+}
+
+function drawStreetAndTraffic(){
+  const gy = H - GROUND;
+  if (mapMode === '3d'){
+    // 3D Isometric Queen Street West road deck over the map
+    ctx.fillStyle = 'rgba(15, 18, 32, 0.78)';
+    ctx.fillRect(0, gy - 6, W, 56);
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(0, gy - 8, W, 5);
+    // Streetcar silver tracks
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.75)';
+    ctx.fillRect(0, gy + 14, W, 2);
+    ctx.fillRect(0, gy + 22, W, 2);
+    // Center yellow dashes
+    ctx.fillStyle = '#FFD600';
+    const dashOff = -((cam.x)%72);
+    for (let x = dashOff; x < W; x += 72) ctx.fillRect(x, gy + 28, 34, 3);
+  }
+
+  // Toronto Cross-Street Signs
+  const b0 = Math.floor(cam.x/STREET_LEN)-1, b1 = Math.ceil((cam.x+W)/STREET_LEN)+1;
+  for (let s = b0; s <= b1; s++){
+    const worldX = s*STREET_LEN + (BLOCK-1)*CELL + CELL/2;
+    const sx = screenOf(worldX, gy).x;
+    const name = STREETS[((s%STREETS.length)+STREETS.length)%STREETS.length];
+    // Post
+    ctx.fillStyle = '#CBD5E1';
+    ctx.fillRect(sx - 2, gy - 128, 4, 122);
+    // Iconic Toronto Green/White Street Blade
+    ctx.fillStyle = '#0A6B3A';
+    ctx.fillRect(sx - 66, gy - 154, 132, 28);
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5;
+    ctx.strokeRect(sx - 64, gy - 152, 128, 24);
+    ctx.fillStyle = '#FFFFFF'; ctx.font = '800 13px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(name.toUpperCase(), sx, gy - 135);
+  }
+
+  // 3D Extruded TTC 501 Streetcars & Vehicles
+  cars.forEach(c => {
+    const p = screenOf(c.x, H - GROUND - 20);
+    const x = p.x, y = p.y + (c.lane ? 22 : 0);
+    if (c.tram){
+      // 3D roof extrusion on TTC 501 Streetcar
+      ctx.fillStyle = '#991B1B';
+      ctx.beginPath();
+      ctx.moveTo(x, y-38); ctx.lineTo(x+10, y-46);
+      ctx.lineTo(x+186, y-46); ctx.lineTo(x+176, y-38);
+      ctx.closePath(); ctx.fill();
+
+      ctx.fillStyle = '#E11D48';
+      ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2;
+      ctx.fillRect(x, y-38, 176, 38);
+      ctx.strokeRect(x, y-38, 176, 38);
+
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(x, y-15, 176, 4);
+      ctx.fillStyle = '#7DD3FC';
+      for (let k=0; k<6; k++) ctx.fillRect(x+8+k*28, y-32, 21, 13);
+      ctx.fillStyle = '#FFD600'; ctx.font = '900 10px monospace'; ctx.textAlign = 'left';
+      ctx.fillText('TTC 501 QUEEN', x+8, y-4);
+      // Trolley pole
+      ctx.strokeStyle = '#E2E8F0'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x+88, y-42); ctx.lineTo(x+102, y-76); ctx.stroke();
+    } else {
+      // 3D Car with glowing headlights
+      ctx.fillStyle = c.col;
+      ctx.strokeStyle = '#050711'; ctx.lineWidth = 2;
+      ctx.fillRect(x, y-18, 74, 18);
+      ctx.strokeRect(x, y-18, 74, 18);
+      ctx.fillRect(x+14, y-31, 42, 14);
+      ctx.strokeRect(x+14, y-31, 42, 14);
+      ctx.fillStyle = '#BAE6FD';
+      ctx.fillRect(x+18, y-29, 15, 10);
+      ctx.fillRect(x+36, y-29, 15, 10);
+      // Headlight beam
+      ctx.fillStyle = 'rgba(255, 240, 138, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(x, y-14); ctx.lineTo(x-38, y-22); ctx.lineTo(x-38, y-2);
+      ctx.closePath(); ctx.fill();
+      // Wheels
+      ctx.fillStyle = '#090D16';
+      ctx.beginPath(); ctx.arc(x+15, y, 6.5, 0, 7); ctx.arc(x+58, y, 6.5, 0, 7); ctx.fill();
+    }
+  });
+}
+
+function drawWebAndTrail(){
+  const suit = SUITS[suitIdx];
+  // Speed ribbon trail
+  if (trail.length > 2){
+    for (let i = 1; i < trail.length; i++){
+      const a = screenOf(trail[i-1].x, trail[i-1].y);
+      const b = screenOf(trail[i].x, trail[i].y);
+      const alpha = (i / trail.length) * 0.55;
+      ctx.strokeStyle = i % 2 ? suit.trail[0] : suit.trail[1];
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = (i / trail.length) * 7;
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  if (!anchor) return;
+  const a = screenOf(anchor.x, anchor.y), p = screenOf(P.x, P.y);
+  // Outer electric web glow
+  ctx.strokeStyle = suit.web;
+  ctx.globalAlpha = 0.4;
+  ctx.lineWidth = 7;
+  ctx.beginPath(); ctx.moveTo(p.x, p.y - 8); ctx.lineTo(a.x, a.y); ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Main taught web strand
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.moveTo(p.x, p.y - 8); ctx.lineTo(a.x, a.y); ctx.stroke();
+
+  // Anchor web splat
+  ctx.strokeStyle = suit.web; ctx.lineWidth = 1.6;
+  ctx.beginPath(); ctx.arc(a.x, a.y, 8, 0, 7); ctx.stroke();
+}
+
+function drawSpidey(){
+  const suit = SUITS[suitIdx];
+  const sp = screenOf(P.x, P.y), x = sp.x, y = sp.y;
+  ctx.save();
+  ctx.translate(x, y);
+  const swing = !!anchor;
+  ctx.rotate(swing ? Math.atan2(anchor.x - P.x, -(anchor.y - P.y))*0.78 : P.ang);
+
+  // Iron Spider mechanical golden Waldoes (if Iron Spider suit equipped)
+  if (suit.waldoes){
+    ctx.strokeStyle = '#FFD600';
+    ctx.lineWidth = 3.2;
+    ctx.lineJoin = 'round';
+    const wWave = Math.sin(time*9)*5;
+    [[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([sx, sy], idx) => {
+      ctx.beginPath();
+      ctx.moveTo(0, -4);
+      ctx.lineTo(sx*(20 + idx*2), sy*14 + wWave*sy);
+      ctx.lineTo(sx*32, sy*4 - 10 + wWave);
+      ctx.stroke();
+    });
+  }
+
+  // Dynamic legs
+  ctx.lineCap = 'round';
+  const run = Math.sin(time*14)*0.65;
+  ctx.strokeStyle = suit.secondary;
+  ctx.lineWidth = 7.5;
+  ctx.beginPath();
+  ctx.moveTo(-3, 9); ctx.lineTo(swing ? -15 : -10 + run*7, 25);
+  ctx.moveTo(3, 9);  ctx.lineTo(swing ? 11 : 10 - run*7, 25);
+  ctx.stroke();
+
+  // Boots / Red accents
+  ctx.strokeStyle = suit.accent;
+  ctx.lineWidth = 6.5;
+  ctx.beginPath();
+  ctx.moveTo(swing ? -13 : -9 + run*5, 19); ctx.lineTo(swing ? -15 : -10 + run*7, 25);
+  ctx.moveTo(swing ? 9 : 9 - run*5, 19);   ctx.lineTo(swing ? 11 : 10 - run*7, 25);
+  ctx.stroke();
+
+  // Suit Torso
+  ctx.fillStyle = suit.primary;
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.ellipse(0, 0, 11.5, 16.5, 0, 0, 7); ctx.fill(); ctx.stroke();
+
+  // V-shaped chest chevron / belt
+  ctx.fillStyle = suit.accent;
+  ctx.beginPath();
+  ctx.moveTo(-10, -9); ctx.lineTo(0, 3); ctx.lineTo(10, -9);
+  ctx.lineTo(7, -12);  ctx.lineTo(0, -3); ctx.lineTo(-7, -12);
+  ctx.closePath(); ctx.fill();
+
+  // Streetwear collar for Miles suit
+  if (suit.hoodie){
+    ctx.fillStyle = '#FF1744';
+    ctx.beginPath(); ctx.ellipse(0, -13, 11, 4.5, 0, 0, 7); ctx.fill();
+  }
+
+  // Chest Spider Emblem
+  ctx.fillStyle = suit.accent;
+  ctx.beginPath(); ctx.ellipse(0, -1, 3, 5.5, 0, 0, 7); ctx.fill();
+
+  // Dynamic web-shooting arms
+  ctx.strokeStyle = suit.primary;
+  ctx.lineWidth = 6.5;
+  ctx.beginPath();
+  ctx.moveTo(4, -8);  ctx.lineTo(swing ? 10 : 18, swing ? -28 : -3);
+  ctx.moveTo(-4, -8); ctx.lineTo(-15, swing ? 5 : 3);
+  ctx.stroke();
+
+  // Masked Head with Rim Highlight
+  ctx.fillStyle = suit.primary;
+  ctx.strokeStyle = suit.eyeTrim;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(0, -23, 11, 0, 7); ctx.fill(); ctx.stroke();
+
+  // Expressive Angular Spider-Eyes
+  ctx.fillStyle = suit.eyeGlow;
+  ctx.strokeStyle = suit.eyeTrim;
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.ellipse(-4.5, -24, 4.6, 3.1, -0.28, 0, 7);
+  ctx.ellipse(4.5, -24, 4.6, 3.1, 0.28, 0, 7);
+  ctx.fill(); ctx.stroke();
+
+  ctx.restore();
+}
+
+function drawTokens(){
+  tokens.forEach(t => {
+    const p = screenOf(t.x, t.y), x = p.x, y = p.y + Math.sin(time*4.5 + t.x)*5;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(time*1.8);
+    ctx.fillStyle = 'rgba(255, 214, 0, 0.25)';
+    ctx.strokeStyle = '#FFD600'; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.arc(0, 0, 17, 0, 7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let k=0; k<6; k++){
+      const a = k*Math.PI/3;
+      ctx.moveTo(0,0); ctx.lineTo(Math.cos(a)*14, Math.sin(a)*14);
+    }
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function drawMinimap(){
+  const w = 270, h = 175, x = W - w - 20, y = 18, z = 14;
+  const g = routeGeo(P.x), pxT = txz(g.lon, z), cyT = tyz(g.lat, z);
+
+  ctx.save();
+  // Comic shadow frame
+  ctx.fillStyle = '#FF1744';
+  ctx.fillRect(x + 6, y + 6, w, h);
+  ctx.fillStyle = '#00E5FF';
+  ctx.fillRect(x - 4, y - 4, w, h);
+
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  ctx.fillStyle = '#0F172A'; ctx.fillRect(x, y, w, h);
+
+  const ox = x + w/2 - pxT*256, oy = y + h/2 - cyT*256;
+  for (let i = Math.floor(pxT-w/512)-1; i <= Math.floor(pxT+w/512)+1; i++){
+    for (let j = Math.floor(cyT-h/512)-1; j <= Math.floor(cyT+h/512)+1; j++){
+      const im = tileAt(z, i, j);
+      if (im.complete && im.naturalWidth) ctx.drawImage(im, ox + i*256, oy + j*256);
+    }
+  }
+
+  // Queen St W Route Line
+  ctx.strokeStyle = '#FF1744'; ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  PTS.forEach((p,i) => {
+    const sx = ox + txz(p.lon,z)*256, sy = oy + tyz(p.lat,z)*256;
+    i ? ctx.lineTo(sx,sy) : ctx.moveTo(sx,sy);
+  });
+  ctx.stroke();
+
+  // Radar Pulse + Spidey GPS Pin
+  const pulse = (time*24) % 22;
+  ctx.strokeStyle = 'rgba(255, 23, 68, 0.7)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(x+w/2, y+h/2, 6 + pulse, 0, 7); ctx.stroke();
+
+  ctx.fillStyle = SUITS[suitIdx].accent;
+  ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.arc(x+w/2, y+h/2, 6.5, 0, 7); ctx.fill(); ctx.stroke();
+
+  // Minimap header bar
+  ctx.fillStyle = 'rgba(7, 8, 18, 0.86)';
+  ctx.fillRect(x, y, w, 22);
+  ctx.fillStyle = '#FFFFFF'; ctx.font = '800 10px monospace'; ctx.textAlign = 'left';
+  ctx.fillText('LIVE GPS • QUEEN ST W TORONTO', x + 8, y + 15);
+  ctx.restore();
+
+  ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2.5;
+  ctx.strokeRect(x, y, w, h);
 }
 
 function curStreet(){
-  const i=Math.floor(P.x/STREET_LEN);
+  const i = Math.floor(P.x/STREET_LEN);
   return STREETS[((i%STREETS.length)+STREETS.length)%STREETS.length];
 }
 
-function drawHUD(){
-  ctx.textAlign='left'; ctx.fillStyle='#fff'; ctx.font='bold 28px "Arial Black",Arial';
-  ctx.fillText(Math.floor(score).toString().padStart(6,'0'),20,44);
-  ctx.font='bold 14px Arial'; ctx.fillStyle='#ffd400'; ctx.fillText('BEST '+Math.floor(best),20,66);
-  if (combo>1){ ctx.fillStyle='#ff4455'; ctx.font='bold 22px Arial'; ctx.fillText('x'+combo+' COMBO',20,96); }
-  ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(20,108,230,26);
-  ctx.fillStyle='#fff'; ctx.font='bold 13px Arial';   ctx.fillText('OPENSTREETMAP  ›  near '+curStreet(),28,126);
-  ctx.fillText('Speed '+Math.floor(P.vx/10)+' km/h',20,152);
-  drawMinimap();
+function syncDOMHUD(){
+  document.getElementById('scoreVal').textContent = Math.floor(score).toString().padStart(6, '0');
+  document.getElementById('bestVal').textContent = 'BEST ' + Math.floor(best);
+  document.getElementById('distVal').textContent = `${SUITS[suitIdx].name} • ${(P.x/1000).toFixed(1)} KM`;
+  document.getElementById('streetVal').textContent = 'Queen St W › ' + curStreet();
+  document.getElementById('speedVal').textContent = Math.floor(P.vx/9) + ' km/h';
+
+  const cp = document.getElementById('comboPill');
+  if (combo > 1){
+    cp.style.display = 'inline-block';
+    cp.textContent = `x${combo} ${SUITS[suitIdx].name.split(' ')[0]} COMBO!`;
+  } else {
+    cp.style.display = 'none';
+  }
 }
 
-function drawMenu(){
-  ctx.fillStyle='rgba(0,0,0,.55)'; ctx.fillRect(0,0,W,H);
-  ctx.textAlign='center';
-  ctx.fillStyle='#d41f2b'; ctx.font='bold '+Math.min(80,W/10)+'px Impact,"Arial Black"';
-  ctx.strokeStyle='#fff'; ctx.lineWidth=4; ctx.strokeText('SPIDEY: TORONTO SWING',W/2,H*.35); ctx.fillText('SPIDEY: TORONTO SWING',W/2,H*.35);
-  ctx.fillStyle='#fff'; ctx.font='bold 20px Arial';
-  ctx.fillText('Swing down Queen Street West past the CN Tower, City Hall and Yonge St.',W/2,H*.45);
-  ctx.fillText('HOLD SPACE / MOUSE to shoot a web  •  RELEASE to fly',W/2,H*.52);
-  ctx.fillText('Collect web-tokens. Hit a car or streetcar and the run is over.',W/2,H*.58);
-  if (Math.floor(time*2)%2) { ctx.fillStyle='#ffd400'; ctx.font='bold 26px Arial'; ctx.fillText('PRESS SPACE TO START',W/2,H*.70); }
-}
+function drawPopupsAndParticles(){
+  particles.forEach(p => {
+    const s = screenOf(p.x, p.y);
+    ctx.fillStyle = p.c;
+    ctx.globalAlpha = Math.max(0, p.l*2);
+    ctx.fillRect(s.x, s.y, 4, 4);
+  });
+  ctx.globalAlpha = 1;
 
-function drawOver(){
-  ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(0,0,W,H); drawMinimap();
-  ctx.textAlign='center'; ctx.fillStyle='#d41f2b'; ctx.strokeStyle='#fff'; ctx.lineWidth=4;
-  ctx.font='bold '+Math.min(80,W/10)+'px Impact,"Arial Black"';
-  ctx.strokeText('CRASHED!',W/2,H*.38); ctx.fillText('CRASHED!',W/2,H*.38);
-  ctx.fillStyle='#fff'; ctx.font='bold 24px Arial';
-  ctx.fillText('You hit a vehicle on Queen St W near '+curStreet(),W/2,H*.48);
-  ctx.fillText('Score '+Math.floor(score)+'   Best '+Math.floor(best),W/2,H*.55);
-  if (time-overAt>0.8 && Math.floor(time*2)%2){ ctx.fillStyle='#ffd400'; ctx.fillText('PRESS SPACE TO RETRY',W/2,H*.66); }
+  popups.forEach(p => {
+    const s = screenOf(p.x, p.y);
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(-0.08);
+    ctx.font = '900 22px Impact, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.strokeStyle = '#050711'; ctx.lineWidth = 4;
+    ctx.fillStyle = p.col;
+    ctx.strokeText(p.txt, 0, 0);
+    ctx.fillText(p.txt, 0, 0);
+    ctx.restore();
+  });
 }
 
 function frame(t){
-  const dt = Math.min(.033,(t-(frame.t||t))/1000); frame.t=t;
+  const dt = Math.min(0.033, (t - (frame.t || t))/1000); frame.t = t;
   update(dt);
-  if (state==='play'){ if (score>best){ best=score; localStorage.spideyBest=best; } }
+  if (state === 'play' && score > best){ best = score; localStorage.spideyBest = best; }
+
   ctx.save();
-  if (shake>0) ctx.translate((Math.random()-.5)*8,(Math.random()-.5)*8);
-  drawCityMap();
-  drawStreetSigns();
-  drawStreet();
+  if (shake > 0) ctx.translate((Math.random()-.5)*10, (Math.random()-.5)*10);
+
+  if (mapMode === '3d'){
+    const horizonY = H * 0.42;
+    drawSkyAndLandmarks(horizonY);
+    drawMapPlane(horizonY);
+    draw3DBuildings();
+  } else {
+    drawMapPlane(0);
+    draw3DBuildings();
+  }
+
+  drawStreetAndTraffic();
   drawTokens();
-  drawWeb();
-  if (state==='play') drawSpidey();
-  particles.forEach(p=>{ctx.fillStyle=p.c; ctx.globalAlpha=Math.max(0,p.l*2); ctx.fillRect(p.x-cam.x,p.y,3,3); ctx.globalAlpha=1;});
+  drawWebAndTrail();
+  drawSpidey();
+  drawPopupsAndParticles();
   ctx.restore();
-  if (state==='play') drawHUD(); else if (state==='over') drawOver(); else drawMenu();
+
+  drawMinimap();
+  syncDOMHUD();
   requestAnimationFrame(frame);
 }
+updateOverlayUI();
 requestAnimationFrame(frame);
 </script>
 </body>
