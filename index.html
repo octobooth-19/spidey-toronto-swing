@@ -130,9 +130,11 @@ function update(dt){
   cars = cars.filter(c=>c.x>cam.x-400);
   const gyS=H-GROUND;
   for (const c of cars){
-    const cy=gyS+(c.lane?44:12), cw=c.tram?170:70, ch=c.tram?34:30;
-    if (P.x+10>c.x && P.x-10<c.x+cw && P.y+24>cy-ch && P.y-32<cy){
-      state='over'; overAt=time; shake=.5; burst(P.x,P.y,40,'#d41f2b'); burst(P.x,P.y,20,'#ffd400'); anchor=null; holding=false; return;
+    const cy=gyS+(c.lane?44:12), cw=c.tram?170:70, ch=c.tram?40:34;
+    const hit = P.x+14>c.x-6 && P.x-14<c.x+cw+6 && P.y+26>cy-ch && P.y-18<cy+8;
+    if (hit){
+      state='over'; overAt=time; shake=.6; burst(P.x,P.y,40,'#d41f2b'); burst(P.x,P.y,20,'#ffd400');
+      anchor=null; holding=false; P.vx*=0.2; P.vy=0; return;
     }
   }
   score += P.vx*dt*0.02;
@@ -235,8 +237,8 @@ function drawBuildings(){
 
 function drawStreet(){
   const gy=H-GROUND;
-  ctx.fillStyle='#2a2a30'; ctx.fillRect(0,gy,W,GROUND);
-  ctx.fillStyle='#55555e'; ctx.fillRect(0,gy,W,6);        // sidewalk
+  ctx.fillStyle='rgba(22,22,26,.42)'; ctx.fillRect(0,gy,W,GROUND);
+  ctx.fillStyle='rgba(70,70,78,.7)'; ctx.fillRect(0,gy,W,6);
   // streetcar rails
   ctx.fillStyle='#777'; ctx.fillRect(0,gy+34,W,2); ctx.fillRect(0,gy+38,W,2);
   // dashed line
@@ -310,15 +312,51 @@ function drawTokens(){
   });
 }
 
-// Real OpenStreetMap tiles (zoom 15) of downtown Toronto
-const Z=15, LON0=-79.4026, LON1=-79.3600, LAT=43.6502;
-const tx=(lon)=>(lon+180)/360*2**Z;
-const ty=(lat)=>(1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*2**Z;
+// Real OpenStreetMap of Queen St W, Bathurst → River. Same tiles drive the city and the minimap.
+const Z=15, ZCITY=17, LON0=-79.4110, LON1=-79.3560, LAT0=43.6434, LAT1=43.6568, LAT=43.6502;
+const txz=(lon,z)=>(lon+180)/360*2**z;
+const tyz=(lat,z)=>(1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*2**z;
+const tx=(lon)=>txz(lon,Z), ty=(lat)=>tyz(lat,Z);
 const tiles={};
-function tile(x,y){
-  const k=x+'/'+y; if(tiles[k]) return tiles[k];
-  const im=new Image(); im.crossOrigin='anonymous'; im.src='https://tile.openstreetmap.org/'+Z+'/'+x+'/'+y+'.png';
+function tileAt(z,x,y){
+  const k=z+'/'+x+'/'+y; if(tiles[k]) return tiles[k];
+  const im=new Image(); im.crossOrigin='anonymous';
+  im.src='https://tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png';
   return tiles[k]=im;
+}
+function tile(x,y){ return tileAt(Z,x,y); }
+function geoAt(wx){
+  const f=((wx%ROUTE_LEN)+ROUTE_LEN)%ROUTE_LEN/ROUTE_LEN;
+  return {lon:LON0+(LON1-LON0)*f, lat:LAT0+(LAT1-LAT0)*f};
+}
+function drawCityMap(){
+  const z=ZCITY, top=H*0.34;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(0,top,W,H-top); ctx.clip();
+  ctx.fillStyle='#d7d0c4'; ctx.fillRect(0,top,W,H-top);
+  function paint(wx0,wx1){
+    const a=geoAt(wx0), b=geoAt(wx1);
+    const t0=txz(a.lon,z), t1=txz(b.lon,z);
+    if(t1<=t0+0.001) return;
+    const draw=(wx1-wx0)/(t1-t0);
+    const ox=wx0-cam.x-t0*draw;
+    const cy=tyz((a.lat+b.lat)/2,z);
+    const oy=(H-GROUND+30)-cy*draw;
+    for(let i=Math.floor(t0)-1;i<=Math.ceil(t1)+1;i++)
+      for(let j=Math.floor(cy)-3;j<=Math.ceil(cy)+2;j++){
+        const im=tileAt(z,i,j);
+        if(im.complete&&im.naturalWidth) ctx.drawImage(im,ox+i*draw,oy+j*draw,draw+1,draw+1);
+      }
+  }
+  const seam=Math.ceil((cam.x+1)/ROUTE_LEN)*ROUTE_LEN;
+  if(seam>cam.x && seam<cam.x+W){ paint(cam.x,seam-2); paint(seam+2,cam.x+W); }
+  else paint(cam.x,cam.x+W);
+  const fade=ctx.createLinearGradient(0,top,0,top+80);
+  fade.addColorStop(0,'rgba(11,16,48,.95)'); fade.addColorStop(1,'rgba(11,16,48,0)');
+  ctx.fillStyle=fade; ctx.fillRect(0,top,W,80);
+  ctx.fillStyle='rgba(255,255,255,.8)'; ctx.font='11px Arial'; ctx.textAlign='left';
+  ctx.fillText('© OpenStreetMap contributors',12,H-6);
+  ctx.restore();
 }
 function drawMinimap(){
   const w=300,h=190,x=W-w-16,y=16, cxT=tx((LON0+LON1)/2), cyT=ty(LAT);
@@ -370,12 +408,11 @@ function drawMenu(){
   ctx.fillStyle='#fff'; ctx.font='bold 20px Arial';
   ctx.fillText('Swing down Queen Street West past the CN Tower, City Hall and Yonge St.',W/2,H*.45);
   ctx.fillText('HOLD SPACE / MOUSE to shoot a web  •  RELEASE to fly',W/2,H*.52);
-  ctx.fillText('Collect gold web-tokens, chain swings for combos, avoid the street!',W/2,H*.58);
+  ctx.fillText('Collect web-tokens. Hit a car or streetcar and the run is over.',W/2,H*.58);
   if (Math.floor(time*2)%2) { ctx.fillStyle='#ffd400'; ctx.font='bold 26px Arial'; ctx.fillText('PRESS SPACE TO START',W/2,H*.70); }
 }
 
 function drawOver(){
-  drawMinimap();
   ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(0,0,W,H); drawMinimap();
   ctx.textAlign='center'; ctx.fillStyle='#d41f2b'; ctx.strokeStyle='#fff'; ctx.lineWidth=4;
   ctx.font='bold '+Math.min(80,W/10)+'px Impact,"Arial Black"';
@@ -397,7 +434,8 @@ function frame(t){
   drawFarLandmarks();
   farLayer(.3,H-GROUND-20,'#1d1638',77,260,6);
   farLayer(.55,H-GROUND,'#150f2b',33,200,10);
-  drawBuildings();
+  drawCityMap();
+  ctx.save(); ctx.globalAlpha=0.38; drawBuildings(); ctx.restore();
   drawStreet();
   drawTokens();
   drawWeb();
