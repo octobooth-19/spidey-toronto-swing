@@ -2,6 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <title>Spidey Toronto Swing</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -121,17 +124,18 @@ function update(dt){
     tokens.push({x:lastX+200+Math.random()*250, y: 80+Math.random()*(H-GROUND-250)});
   }
   tokens = tokens.filter(t=>{
-    if (Math.hypot(t.x-P.x,t.y-P.y)<36){ score+=50*(1+combo); combo++; burst(t.x,t.y,10,'#ffd400'); return false; }
+    const ts=screenOf(t.x,t.y), ps=screenOf(P.x,P.y);
+    if (Math.hypot(ts.x-ps.x,ts.y-ps.y)<36){ score+=50*(1+combo); combo++; burst(t.x,t.y,10,'#ffd400'); return false; }
     return t.x > cam.x-100;
   });
   // traffic
   if (Math.random()<dt*0.9) cars.push({x:cam.x+W+200, v:-(100+Math.random()*120), col:['#c8102e','#222','#e8e8e8','#2457c5'][Math.random()*4|0], tram:Math.random()<.2, lane:Math.random()<.5?0:1});
   cars.forEach(c=>c.x+=c.v*dt);
   cars = cars.filter(c=>c.x>cam.x-400);
-  const gyS=H-GROUND;
+  const sp=screenOf(P.x,P.y);
   for (const c of cars){
-    const cy=gyS+(c.lane?44:12), cw=c.tram?170:70, ch=c.tram?40:34;
-    const hit = P.x+14>c.x-6 && P.x-14<c.x+cw+6 && P.y+26>cy-ch && P.y-18<cy+8;
+    const cs=screenOf(c.x, H-GROUND-20), cw=c.tram?170:70, ch=c.tram?40:34;
+    const hit = sp.x+14>cs.x-6 && sp.x-14<cs.x+cw+6 && sp.y+26>cs.y-ch && sp.y-18<cs.y+8;
     if (hit){
       state='over'; overAt=time; shake=.6; burst(P.x,P.y,40,'#d41f2b'); burst(P.x,P.y,20,'#ffd400');
       anchor=null; holding=false; P.vx*=0.2; P.vy=0; return;
@@ -235,26 +239,26 @@ function drawBuildings(){
   }
 }
 
-function drawStreet(){
+function drawStreetSigns(){
   const gy=H-GROUND;
-  ctx.fillStyle='rgba(22,22,26,.42)'; ctx.fillRect(0,gy,W,GROUND);
-  ctx.fillStyle='rgba(70,70,78,.7)'; ctx.fillRect(0,gy,W,6);
-  // streetcar rails
-  ctx.fillStyle='#777'; ctx.fillRect(0,gy+34,W,2); ctx.fillRect(0,gy+38,W,2);
-  // dashed line
-  ctx.fillStyle='#ffd400';
-  const off = -((cam.x)%80);
-  for (let x=off-80;x<W;x+=80) ctx.fillRect(x,gy+52,40,3);
-  // crosswalks at cross streets
   const b0 = Math.floor(cam.x/STREET_LEN)-1, b1 = Math.ceil((cam.x+W)/STREET_LEN)+1;
   for (let s=b0;s<=b1;s++){
-    const sx = (s*STREET_LEN + (BLOCK-1)*CELL + CELL/2) - cam.x;
-    ctx.fillStyle='rgba(255,255,255,.8)';
-    for(let k=-3;k<=3;k++) ctx.fillRect(sx+k*14-4,gy+8,8,50);
+    const worldX = s*STREET_LEN + (BLOCK-1)*CELL + CELL/2;
+    const sx = screenOf(worldX, H-GROUND-20).x;
+    const name = STREETS[((s%STREETS.length)+STREETS.length)%STREETS.length];
+    ctx.fillStyle='#0a6b3a'; ctx.fillRect(sx-62,gy-150,124,26);
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(sx-60,gy-148,120,22);
+    ctx.fillStyle='#fff'; ctx.font='bold 13px Arial'; ctx.textAlign='center'; ctx.fillText(name,sx,gy-131);
+    ctx.fillStyle='#555'; ctx.fillRect(sx-2,gy-124,4,124);
+    ctx.fillStyle='#222'; ctx.fillRect(sx+40,gy-90,10,28);
+    ctx.fillStyle=(Math.floor(time*0.5+s)%2)?'#2f2':'#f22';
+    ctx.beginPath(); ctx.arc(sx+45,gy-84,3,0,7); ctx.fill();
   }
-  // cars & TTC streetcars
+}
+
+function drawStreet(){
   cars.forEach(c=>{
-    const x=c.x-cam.x, y=gy+(c.lane?44:12);
+    const p=screenOf(c.x, H-GROUND-20), x=p.x, y=p.y+(c.lane?18:0);
     if (c.tram){
       ctx.fillStyle='#da291c'; ctx.fillRect(x,y-34,170,36);
       ctx.fillStyle='#fff'; ctx.fillRect(x,y-14,170,4);
@@ -271,15 +275,15 @@ function drawStreet(){
 
 function drawWeb(){
   if (!anchor) return;
-  const ax=anchor.x-cam.x, ay=anchor.y;
+  const a=screenOf(anchor.x, anchor.y), p=screenOf(P.x, P.y);
   ctx.strokeStyle='rgba(255,255,255,.95)'; ctx.lineWidth=2.5;
-  ctx.beginPath(); ctx.moveTo(P.x-cam.x,P.y-6); ctx.lineTo(ax,ay); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p.x,p.y-6); ctx.lineTo(a.x,a.y); ctx.stroke();
   ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.lineWidth=5;
-  ctx.beginPath(); ctx.moveTo(P.x-cam.x,P.y-6); ctx.lineTo(ax,ay); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(p.x,p.y-6); ctx.lineTo(a.x,a.y); ctx.stroke();
 }
 
 function drawSpidey(){
-  const x=P.x-cam.x, y=P.y;
+  const sp=screenOf(P.x,P.y), x=sp.x, y=sp.y;
   ctx.save(); ctx.translate(x,y);
   const swing = !!anchor;
   ctx.rotate(swing ? Math.atan2(anchor.x-P.x, -(anchor.y-P.y))*0.8 : P.ang);
@@ -305,81 +309,75 @@ function drawSpidey(){
 
 function drawTokens(){
   tokens.forEach(t=>{
-    const x=t.x-cam.x, y=t.y+Math.sin(time*4+t.x)*4;
+    const p=screenOf(t.x,t.y), x=p.x, y=p.y+Math.sin(time*4+t.x)*4;
     ctx.strokeStyle='#ffd400'; ctx.lineWidth=2; ctx.fillStyle='rgba(255,212,0,.25)';
     ctx.beginPath(); ctx.arc(x,y,16,0,7); ctx.fill(); ctx.stroke();
     ctx.beginPath(); for(let k=0;k<6;k++){const a=k*Math.PI/3; ctx.moveTo(x,y); ctx.lineTo(x+Math.cos(a)*14,y+Math.sin(a)*14);} ctx.stroke();
   });
 }
 
-// Real OpenStreetMap of Queen St W, Bathurst → River. Same tiles drive the city and the minimap.
-const Z=15, ZCITY=17, LON0=-79.4110, LON1=-79.3560, LAT0=43.6434, LAT1=43.6568, LAT=43.6502;
+// Official OpenStreetMap raster tiles, drawn 1:1 (not stretched) along Queen St W.
+const Z=16, ZCITY=16;
+const PTS=[
+  {lon:-79.4112,lat:43.6433},{lon:-79.4074,lat:43.6435},{lon:-79.3955,lat:43.6487},
+  {lon:-79.3900,lat:43.6496},{lon:-79.3864,lat:43.6504},{lon:-79.3832,lat:43.6515},
+  {lon:-79.3791,lat:43.6525},{lon:-79.3747,lat:43.6529},{lon:-79.3715,lat:43.6535},
+  {lon:-79.3678,lat:43.6541},{lon:-79.3641,lat:43.6549},{lon:-79.3563,lat:43.6566}
+];
 const txz=(lon,z)=>(lon+180)/360*2**z;
 const tyz=(lat,z)=>(1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*2**z;
 const tx=(lon)=>txz(lon,Z), ty=(lat)=>tyz(lat,Z);
 const tiles={};
 function tileAt(z,x,y){
   const k=z+'/'+x+'/'+y; if(tiles[k]) return tiles[k];
-  const im=new Image(); im.crossOrigin='anonymous';
+  const im=new Image();
   im.src='https://tile.openstreetmap.org/'+z+'/'+x+'/'+y+'.png';
   return tiles[k]=im;
 }
 function tile(x,y){ return tileAt(Z,x,y); }
-function geoAt(wx){
+function routeGeo(wx){
   const f=((wx%ROUTE_LEN)+ROUTE_LEN)%ROUTE_LEN/ROUTE_LEN;
-  return {lon:LON0+(LON1-LON0)*f, lat:LAT0+(LAT1-LAT0)*f};
+  const t=f*(PTS.length-1), i=Math.min(PTS.length-2, t|0), u=t-i;
+  return {lon:PTS[i].lon+(PTS[i+1].lon-PTS[i].lon)*u, lat:PTS[i].lat+(PTS[i+1].lat-PTS[i].lat)*u};
+}
+function mapOrigin(){
+  const g=routeGeo(cam.x+W*0.35);
+  return {ox:W*0.35-txz(g.lon,ZCITY)*256, oy:(H-GROUND-20)-tyz(g.lat,ZCITY)*256};
+}
+function screenOf(wx, wy){
+  const o=mapOrigin(), g=routeGeo(wx);
+  const streetY=o.oy+tyz(g.lat,ZCITY)*256;
+  return {x:o.ox+txz(g.lon,ZCITY)*256, y:streetY-((H-GROUND-20)-wy)};
 }
 function drawCityMap(){
-  const z=ZCITY, top=H*0.34;
-  ctx.save();
-  ctx.beginPath(); ctx.rect(0,top,W,H-top); ctx.clip();
-  ctx.fillStyle='#d7d0c4'; ctx.fillRect(0,top,W,H-top);
-  function paint(wx0,wx1){
-    const a=geoAt(wx0), b=geoAt(wx1);
-    const t0=txz(a.lon,z), t1=txz(b.lon,z);
-    if(t1<=t0+0.001) return;
-    const draw=(wx1-wx0)/(t1-t0);
-    const ox=wx0-cam.x-t0*draw;
-    const cy=tyz((a.lat+b.lat)/2,z);
-    const oy=(H-GROUND+30)-cy*draw;
-    for(let i=Math.floor(t0)-1;i<=Math.ceil(t1)+1;i++)
-      for(let j=Math.floor(cy)-3;j<=Math.ceil(cy)+2;j++){
-        const im=tileAt(z,i,j);
-        if(im.complete&&im.naturalWidth) ctx.drawImage(im,ox+i*draw,oy+j*draw,draw+1,draw+1);
-      }
+  const o=mapOrigin(), z=ZCITY;
+  ctx.fillStyle='#f2efe9'; ctx.fillRect(0,0,W,H);
+  const i0=Math.floor(-o.ox/256)-1, i1=Math.floor((W-o.ox)/256)+1;
+  const j0=Math.floor(-o.oy/256)-1, j1=Math.floor((H-o.oy)/256)+1;
+  for(let i=i0;i<=i1;i++) for(let j=j0;j<=j1;j++){
+    const im=tileAt(z,i,j);
+    if(im.complete&&im.naturalWidth) ctx.drawImage(im, o.ox+i*256, o.oy+j*256);
   }
-  const seam=Math.ceil((cam.x+1)/ROUTE_LEN)*ROUTE_LEN;
-  if(seam>cam.x && seam<cam.x+W){ paint(cam.x,seam-2); paint(seam+2,cam.x+W); }
-  else paint(cam.x,cam.x+W);
-  const fade=ctx.createLinearGradient(0,top,0,top+80);
-  fade.addColorStop(0,'rgba(11,16,48,.95)'); fade.addColorStop(1,'rgba(11,16,48,0)');
-  ctx.fillStyle=fade; ctx.fillRect(0,top,W,80);
-  ctx.fillStyle='rgba(255,255,255,.8)'; ctx.font='11px Arial'; ctx.textAlign='left';
-  ctx.fillText('© OpenStreetMap contributors',12,H-6);
-  ctx.restore();
+  ctx.fillStyle='rgba(255,255,255,.9)'; ctx.fillRect(8,H-22,210,16);
+  ctx.fillStyle='#333'; ctx.font='11px Arial'; ctx.textAlign='left';
+  ctx.fillText('© OpenStreetMap contributors',12,H-10);
 }
 function drawMinimap(){
-  const w=300,h=190,x=W-w-16,y=16, cxT=tx((LON0+LON1)/2), cyT=ty(LAT);
-  const f=((P.x%ROUTE_LEN)+ROUTE_LEN)%ROUTE_LEN/ROUTE_LEN;
-  const pxT=tx(LON0+(LON1-LON0)*f);
-  const view=0.9*w/256; // tiles-to-px scale (256px tiles shown at 1:1 crop)
+  const w=300,h=190,x=W-w-16,y=16, z=14;
+  const g=routeGeo(P.x), pxT=txz(g.lon,z), cyT=tyz(g.lat,z);
   ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
   ctx.fillStyle='#e9e4d8'; ctx.fillRect(x,y,w,h);
-  const camT=pxT; // map follows the player horizontally
-  const ox=x+w/2-(camT)*256, oy=y+h/2-cyT*256;
-  for(let i=Math.floor(camT-w/512)-0;i<=Math.floor(camT+w/512);i++)
-    for(let j=Math.floor(cyT-h/512);j<=Math.floor(cyT+h/512);j++){
-      const im=tile(i,j); if(im.complete&&im.naturalWidth) ctx.drawImage(im,ox+i*256,oy+j*256,256,256);
+  const ox=x+w/2-pxT*256, oy=y+h/2-cyT*256;
+  for(let i=Math.floor(pxT-w/512)-1;i<=Math.floor(pxT+w/512)+1;i++)
+    for(let j=Math.floor(cyT-h/512)-1;j<=Math.floor(cyT+h/512)+1;j++){
+      const im=tileAt(z,i,j); if(im.complete&&im.naturalWidth) ctx.drawImage(im,ox+i*256,oy+j*256);
     }
-  // route line along Queen St W
-  const ry=oy+cyT*256;
-  ctx.strokeStyle='rgba(212,31,43,.85)'; ctx.lineWidth=4;
-  ctx.beginPath(); ctx.moveTo(ox+tx(LON0)*256,ry); ctx.lineTo(ox+tx(LON1)*256,ry); ctx.stroke();
+  ctx.strokeStyle='rgba(212,31,43,.9)'; ctx.lineWidth=3;
+  ctx.beginPath();
+  PTS.forEach((p,i)=>{ const sx=ox+txz(p.lon,z)*256, sy=oy+tyz(p.lat,z)*256; i?ctx.lineTo(sx,sy):ctx.moveTo(sx,sy); });
+  ctx.stroke();
   ctx.fillStyle='#d41f2b'; ctx.strokeStyle='#fff'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(x+w/2,y+h/2,7,0,7); ctx.fill(); ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,.8)'; ctx.fillRect(x,y+h-14,w,14);
-  ctx.fillStyle='#333'; ctx.font='9px Arial'; ctx.textAlign='left';
-  ctx.fillText('\u00a9 OpenStreetMap contributors',x+4,y+h-4);
+  ctx.beginPath(); ctx.arc(x+w/2,y+h/2,6,0,7); ctx.fill(); ctx.stroke();
   ctx.restore();
   ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(x,y,w,h);
 }
@@ -395,7 +393,7 @@ function drawHUD(){
   ctx.font='bold 14px Arial'; ctx.fillStyle='#ffd400'; ctx.fillText('BEST '+Math.floor(best),20,66);
   if (combo>1){ ctx.fillStyle='#ff4455'; ctx.font='bold 22px Arial'; ctx.fillText('x'+combo+' COMBO',20,96); }
   ctx.fillStyle='rgba(0,0,0,.5)'; ctx.fillRect(20,108,230,26);
-  ctx.fillStyle='#fff'; ctx.font='bold 13px Arial'; ctx.fillText('QUEEN ST W  ›  near '+curStreet(),28,126);
+  ctx.fillStyle='#fff'; ctx.font='bold 13px Arial';   ctx.fillText('OPENSTREETMAP  ›  near '+curStreet(),28,126);
   ctx.fillText('Speed '+Math.floor(P.vx/10)+' km/h',20,152);
   drawMinimap();
 }
@@ -429,13 +427,8 @@ function frame(t){
   if (state==='play'){ if (score>best){ best=score; localStorage.spideyBest=best; } }
   ctx.save();
   if (shake>0) ctx.translate((Math.random()-.5)*8,(Math.random()-.5)*8);
-  drawSky();
-  farLayer(.08,H-GROUND-60,'#2a1a45',1,230,0);
-  drawFarLandmarks();
-  farLayer(.3,H-GROUND-20,'#1d1638',77,260,6);
-  farLayer(.55,H-GROUND,'#150f2b',33,200,10);
   drawCityMap();
-  ctx.save(); ctx.globalAlpha=0.38; drawBuildings(); ctx.restore();
+  drawStreetSigns();
   drawStreet();
   drawTokens();
   drawWeb();
