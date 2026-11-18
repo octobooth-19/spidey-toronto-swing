@@ -4,6 +4,6 @@ Dependency-free browser game. Swing as Spider-Man down Queen St W (Bathurst → 
 
 - **Hold Space / mouse**: shoot web and swing (auto chains swings); **release** to fly
 - Collect gold web-tokens, build combos, avoid the street
-- Toronto touches: TTC 501 streetcars, real cross-street signs in order, downtown minimap with Lake Ontario
+- Toronto touches: TTC 501 streetcars, real cross-street signs in order, live OpenStreetMap minimap; hitting a car ends the game
 
 Run: open `index.html` (or `python3 -m http.server`).

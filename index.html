@@ -45,7 +45,7 @@ function topAt(x){
 
 // ---- game state ----
 const GRAV = 1400, GROUND = 70;
-let P, cam, anchor, ropeLen, holding, score, best = +localStorage.spideyBest||0, tokens, combo, time, state='menu', shake=0, particles=[], cars=[], speedMult=1;
+let overAt=0, P, cam, anchor, ropeLen, holding, score, best = +localStorage.spideyBest||0, tokens, combo, time, state='menu', shake=0, particles=[], cars=[], speedMult=1;
 function reset(){
   P = {x: 300, y: H*0.4, vx: 260, vy: 0, ang:0};
   cam = {x: 0}; anchor=null; holding=false; score=0; combo=0; time=0; particles=[];
@@ -75,18 +75,19 @@ function release(){
   anchor=null; holding=false;
 }
 addEventListener('keydown', e=>{
-  if (e.code==='Space'||e.code==='ArrowUp'){ e.preventDefault(); if(e.repeat)return; if(state!=='play'){start();} else attach(); }
+  if (e.code==='Space'||e.code==='ArrowUp'){ e.preventDefault(); if(e.repeat)return; if(state==='menu'||(state==='over'&&time-overAt>0.8)){start();} else attach(); }
 });
 addEventListener('keyup', e=>{ if (e.code==='Space'||e.code==='ArrowUp') release(); });
-cv.addEventListener('pointerdown', ()=>{ if(state!=='play') start(); else attach(); });
+cv.addEventListener('pointerdown', ()=>{ if(state==='menu'||(state==='over'&&time-overAt>0.8)) start(); else attach(); });
 addEventListener('pointerup', release);
-function start(){ reset(); state='play'; }
+function start(){ const b=best; reset(); state='play'; }
 
 function burst(x,y,n,col){ for(let i=0;i<n;i++) particles.push({x,y,vx:(Math.random()-.5)*300,vy:(Math.random()-.5)*300,l:.5,c:col}); }
 
 // ---- update ----
 function update(dt){
-  if (state!=='play') { time+=dt; cam.x += 80*dt; return; }
+  if (state==='menu') cam.x += 80*dt;
+  if (state!=='play') { time+=dt; particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt;}); particles=particles.filter(p=>p.l>0); shake=Math.max(0,shake-dt); return; }
   time+=dt;
   // physics
   if (holding && !anchor) attach();
@@ -127,6 +128,13 @@ function update(dt){
   if (Math.random()<dt*0.9) cars.push({x:cam.x+W+200, v:-(100+Math.random()*120), col:['#c8102e','#222','#e8e8e8','#2457c5'][Math.random()*4|0], tram:Math.random()<.2, lane:Math.random()<.5?0:1});
   cars.forEach(c=>c.x+=c.v*dt);
   cars = cars.filter(c=>c.x>cam.x-400);
+  const gyS=H-GROUND;
+  for (const c of cars){
+    const cy=gyS+(c.lane?44:12), cw=c.tram?170:70, ch=c.tram?34:30;
+    if (P.x+10>c.x && P.x-10<c.x+cw && P.y+24>cy-ch && P.y-32<cy){
+      state='over'; overAt=time; shake=.5; burst(P.x,P.y,40,'#d41f2b'); burst(P.x,P.y,20,'#ffd400'); anchor=null; holding=false; return;
+    }
+  }
   score += P.vx*dt*0.02;
   particles.forEach(p=>{p.x+=p.vx*dt;p.y+=p.vy*dt;p.l-=dt;}); particles=particles.filter(p=>p.l>0);
   shake=Math.max(0,shake-dt);
@@ -302,33 +310,38 @@ function drawTokens(){
   });
 }
 
-// Stylised downtown Toronto minimap: Lake Ontario, grid of real streets, player marker on Queen St W
+// Real OpenStreetMap tiles (zoom 15) of downtown Toronto
+const Z=15, LON0=-79.4026, LON1=-79.3600, LAT=43.6502;
+const tx=(lon)=>(lon+180)/360*2**Z;
+const ty=(lat)=>(1-Math.log(Math.tan(lat*Math.PI/180)+1/Math.cos(lat*Math.PI/180))/Math.PI)/2*2**Z;
+const tiles={};
+function tile(x,y){
+  const k=x+'/'+y; if(tiles[k]) return tiles[k];
+  const im=new Image(); im.crossOrigin='anonymous'; im.src='https://tile.openstreetmap.org/'+Z+'/'+x+'/'+y+'.png';
+  return tiles[k]=im;
+}
 function drawMinimap(){
-  const w=210,h=150,x=W-w-16,y=16;
-  ctx.save(); ctx.globalAlpha=.9;
-  ctx.fillStyle='#e9e4d8'; ctx.fillRect(x,y,w,h);
-  ctx.fillStyle='#9ec9ea'; ctx.fillRect(x,y+h-26,w,26); // Lake Ontario
-  ctx.fillStyle='#b9d8a0'; ctx.fillRect(x+w-40,y+24,34,30); // Don Valley / park hint
-  ctx.fillStyle='#b9d8a0'; ctx.fillRect(x+30,y+6,36,18);    // Trinity Bellwoods hint
-  const rows=[['Bloor St',.07],['College St',.22],['Dundas St W',.38],['Queen St W',.54],['King St W',.68],['Front St',.80]];
-  ctx.font='8px Arial'; ctx.textAlign='left';
-  rows.forEach(([n,f])=>{
-    ctx.strokeStyle = n==='Queen St W'?'#d41f2b':'#fff'; ctx.lineWidth = n==='Queen St W'?4:3;
-    ctx.beginPath(); ctx.moveTo(x,y+f*h); ctx.lineTo(x+w,y+f*h); ctx.stroke();
-    ctx.fillStyle='#444'; ctx.fillText(n,x+3,y+f*h-3);
-  });
-  // Gardiner
-  ctx.strokeStyle='#c9b27a'; ctx.lineWidth=3; ctx.beginPath(); ctx.moveTo(x,y+h-32); ctx.lineTo(x+w,y+h-32); ctx.stroke();
-  STREETS.forEach((n,i)=>{
-    const sx=x+(i+.5)/STREETS.length*w;
-    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(sx,y); ctx.lineTo(sx,y+h-26); ctx.stroke();
-    ctx.save(); ctx.translate(sx+3,y+h-30); ctx.rotate(-Math.PI/2); ctx.fillStyle='#555'; ctx.font='7px Arial'; ctx.fillText(n.replace(' St','').replace(' Ave',''),0,0); ctx.restore();
-  });
-  ctx.fillStyle='#333'; ctx.beginPath(); ctx.arc(x+w*0.12,y+h-20,3,0,7); ctx.fill(); // CN Tower marker
-  ctx.font='7px Arial'; ctx.fillStyle='#333'; ctx.fillText('CN Tower',x+w*0.12+5,y+h-18);
+  const w=300,h=190,x=W-w-16,y=16, cxT=tx((LON0+LON1)/2), cyT=ty(LAT);
   const f=((P.x%ROUTE_LEN)+ROUTE_LEN)%ROUTE_LEN/ROUTE_LEN;
+  const pxT=tx(LON0+(LON1-LON0)*f);
+  const view=0.9*w/256; // tiles-to-px scale (256px tiles shown at 1:1 crop)
+  ctx.save(); ctx.beginPath(); ctx.rect(x,y,w,h); ctx.clip();
+  ctx.fillStyle='#e9e4d8'; ctx.fillRect(x,y,w,h);
+  const camT=pxT; // map follows the player horizontally
+  const ox=x+w/2-(camT)*256, oy=y+h/2-cyT*256;
+  for(let i=Math.floor(camT-w/512)-0;i<=Math.floor(camT+w/512);i++)
+    for(let j=Math.floor(cyT-h/512);j<=Math.floor(cyT+h/512);j++){
+      const im=tile(i,j); if(im.complete&&im.naturalWidth) ctx.drawImage(im,ox+i*256,oy+j*256,256,256);
+    }
+  // route line along Queen St W
+  const ry=oy+cyT*256;
+  ctx.strokeStyle='rgba(212,31,43,.85)'; ctx.lineWidth=4;
+  ctx.beginPath(); ctx.moveTo(ox+tx(LON0)*256,ry); ctx.lineTo(ox+tx(LON1)*256,ry); ctx.stroke();
   ctx.fillStyle='#d41f2b'; ctx.strokeStyle='#fff'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.arc(x+f*w,y+.54*h,5,0,7); ctx.fill(); ctx.stroke();
+  ctx.beginPath(); ctx.arc(x+w/2,y+h/2,7,0,7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='rgba(255,255,255,.8)'; ctx.fillRect(x,y+h-14,w,14);
+  ctx.fillStyle='#333'; ctx.font='9px Arial'; ctx.textAlign='left';
+  ctx.fillText('\u00a9 OpenStreetMap contributors',x+4,y+h-4);
   ctx.restore();
   ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.strokeRect(x,y,w,h);
 }
@@ -361,6 +374,18 @@ function drawMenu(){
   if (Math.floor(time*2)%2) { ctx.fillStyle='#ffd400'; ctx.font='bold 26px Arial'; ctx.fillText('PRESS SPACE TO START',W/2,H*.70); }
 }
 
+function drawOver(){
+  drawMinimap();
+  ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(0,0,W,H); drawMinimap();
+  ctx.textAlign='center'; ctx.fillStyle='#d41f2b'; ctx.strokeStyle='#fff'; ctx.lineWidth=4;
+  ctx.font='bold '+Math.min(80,W/10)+'px Impact,"Arial Black"';
+  ctx.strokeText('CRASHED!',W/2,H*.38); ctx.fillText('CRASHED!',W/2,H*.38);
+  ctx.fillStyle='#fff'; ctx.font='bold 24px Arial';
+  ctx.fillText('You hit a vehicle on Queen St W near '+curStreet(),W/2,H*.48);
+  ctx.fillText('Score '+Math.floor(score)+'   Best '+Math.floor(best),W/2,H*.55);
+  if (time-overAt>0.8 && Math.floor(time*2)%2){ ctx.fillStyle='#ffd400'; ctx.fillText('PRESS SPACE TO RETRY',W/2,H*.66); }
+}
+
 function frame(t){
   const dt = Math.min(.033,(t-(frame.t||t))/1000); frame.t=t;
   update(dt);
@@ -379,7 +404,7 @@ function frame(t){
   if (state==='play') drawSpidey();
   particles.forEach(p=>{ctx.fillStyle=p.c; ctx.globalAlpha=Math.max(0,p.l*2); ctx.fillRect(p.x-cam.x,p.y,3,3); ctx.globalAlpha=1;});
   ctx.restore();
-  if (state==='play') drawHUD(); else drawMenu();
+  if (state==='play') drawHUD(); else if (state==='over') drawOver(); else drawMenu();
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
